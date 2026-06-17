@@ -487,7 +487,81 @@ async function main() {
   });
   console.log('Created 3 Work Orders');
 
+  // 12. Seed Master Data (42 items across 8 categories)
+  const masterDataEntries = [
+    // asset_type (7)
+    { category: 'asset_type', code: 'building', label: 'Gedung / Bangunan', description: 'Properti gedung dan bangunan', sortOrder: 1 },
+    { category: 'asset_type', code: 'vehicle', label: 'Kendaraan', description: 'Kendaraan operasional', sortOrder: 2 },
+    { category: 'asset_type', code: 'it_equipment', label: 'Peralatan IT', description: 'Server, network, komputer', sortOrder: 3 },
+    { category: 'asset_type', code: 'mep', label: 'MEP (Mekanikal, Elektrikal, Plumbing)', description: 'Sistem MEP gedung', sortOrder: 4 },
+    { category: 'asset_type', code: 'furniture', label: 'Furnitur & Perabot', description: 'Meja, kursi, lemari', sortOrder: 5 },
+    { category: 'asset_type', code: 'tool', label: 'Alat & Perkakas', description: 'Tools teknis operasional', sortOrder: 6 },
+    { category: 'asset_type', code: 'other', label: 'Lainnya', description: 'Aset kategori lain', sortOrder: 7 },
+
+    // facility_type (7)
+    { category: 'facility_type', code: 'data_center', label: 'Data Center', description: 'Fasilitas pusat data', sortOrder: 1 },
+    { category: 'facility_type', code: 'office', label: 'Ruang Kantor', description: 'Ruang kerja perkantoran', sortOrder: 2 },
+    { category: 'facility_type', code: 'warehouse', label: 'Gudang', description: 'Tempat penyimpanan', sortOrder: 3 },
+    { category: 'facility_type', code: 'power_room', label: 'Power Room / Genset', description: 'Ruang panel dan genset', sortOrder: 4 },
+    { category: 'facility_type', code: 'meeting_room', label: 'Ruang Rapat', description: 'Ruang meeting dan konferensi', sortOrder: 5 },
+    { category: 'facility_type', code: 'lobby', label: 'Lobby & Resepsionis', description: 'Area penerimaan tamu', sortOrder: 6 },
+    { category: 'facility_type', code: 'parking', label: 'Area Parkir', description: 'Lahan parkir kendaraan', sortOrder: 7 },
+
+    // location (6)
+    { category: 'location', code: 'jatiluhur', label: 'Jatiluhur, Purwakarta', description: 'Technopark Lintasarta Jatiluhur', sortOrder: 1 },
+    { category: 'location', code: 'thamrin', label: 'Menara Thamrin, Jakarta', description: 'Kantor Pusat Jakarta', sortOrder: 2 },
+    { category: 'location', code: 'bandung', label: 'Bandung Office', description: 'Kantor Bandung', sortOrder: 3 },
+    { category: 'location', code: 'surabaya', label: 'Surabaya Office', description: 'Kantor Surabaya', sortOrder: 4 },
+    { category: 'location', code: 'dc_floor1', label: 'Data Center Lantai 1', description: 'DC Room A - Lantai 1 Jatiluhur', sortOrder: 5 },
+    { category: 'location', code: 'dc_floor2', label: 'Data Center Lantai 2', description: 'DC Room B - Lantai 2 Jatiluhur', sortOrder: 6 },
+
+    // document_type (7)
+    { category: 'document_type', code: 'slf', label: 'Sertifikat Laik Fungsi (SLF)', description: 'SLF dari Kemen PUPR', sortOrder: 1 },
+    { category: 'document_type', code: 'pbg_imb', label: 'Persetujuan Bangunan Gedung (PBG/IMB)', description: 'Izin mendirikan bangunan', sortOrder: 2 },
+    { category: 'document_type', code: 'fire_protection', label: 'Izin Proteksi Kebakaran', description: 'Sertifikasi sistem proteksi kebakaran', sortOrder: 3 },
+    { category: 'document_type', code: 'insurance', label: 'Polis Asuransi', description: 'Asuransi aset / gedung', sortOrder: 4 },
+    { category: 'document_type', code: 'tax_vehicle', label: 'Pajak Kendaraan (PKB/STNK)', description: 'Perpanjangan STNK tahunan', sortOrder: 5 },
+    { category: 'document_type', code: 'k3', label: 'Sertifikasi K3 / SMK3', description: 'Sertifikat keselamatan kerja', sortOrder: 6 },
+    { category: 'document_type', code: 'environmental', label: 'Izin Lingkungan (AMDAL)', description: 'Analisis dampak lingkungan', sortOrder: 7 },
+
+    // asset_status (5)
+    { category: 'asset_status', code: 'good', label: 'Baik', description: 'Kondisi aset sangat baik', sortOrder: 1 },
+    { category: 'asset_status', code: 'warning', label: 'Perlu Perhatian', description: 'Ada indikasi perlu pengecekan', sortOrder: 2 },
+    { category: 'asset_status', code: 'maintenance', label: 'Dalam Perbaikan', description: 'Sedang dalam proses maintenance', sortOrder: 3 },
+    { category: 'asset_status', code: 'critical', label: 'Kritis', description: 'Kondisi kritis, butuh tindakan segera', sortOrder: 4 },
+    { category: 'asset_status', code: 'retired', label: 'Pensiun / Disposal', description: 'Aset sudah tidak aktif', sortOrder: 5 },
+
+    // department (5)
+    { category: 'department', code: 'engineering', label: 'Engineering / MEP', description: 'Tim teknis mekanikal elektrikal', sortOrder: 1 },
+    { category: 'department', code: 'security', label: 'Security', description: 'Tim keamanan gedung', sortOrder: 2 },
+    { category: 'department', code: 'general_affairs', label: 'General Affairs (GA)', description: 'Tim administrasi umum', sortOrder: 3 },
+    { category: 'department', code: 'it', label: 'IT & Network', description: 'Tim infrastruktur IT', sortOrder: 4 },
+    { category: 'department', code: 'finance', label: 'Finance & Accounting', description: 'Tim keuangan', sortOrder: 5 },
+
+    // maintenance_type (4)
+    { category: 'maintenance_type', code: 'preventive', label: 'Preventive Maintenance', description: 'Perawatan terjadwal rutin', sortOrder: 1 },
+    { category: 'maintenance_type', code: 'corrective', label: 'Corrective Maintenance', description: 'Perbaikan setelah kerusakan', sortOrder: 2 },
+    { category: 'maintenance_type', code: 'predictive', label: 'Predictive Maintenance', description: 'Berdasarkan kondisi & monitoring', sortOrder: 3 },
+    { category: 'maintenance_type', code: 'overhaul', label: 'Overhaul / Major Service', description: 'Servis besar periodik', sortOrder: 4 },
+
+    // vendor_category (4)
+    { category: 'vendor_category', code: 'maintenance_vendor', label: 'Vendor Maintenance', description: 'Penyedia layanan perawatan', sortOrder: 1 },
+    { category: 'vendor_category', code: 'supplier', label: 'Supplier Material', description: 'Pemasok suku cadang & material', sortOrder: 2 },
+    { category: 'vendor_category', code: 'insurance_vendor', label: 'Perusahaan Asuransi', description: 'Penyedia asuransi aset', sortOrder: 3 },
+    { category: 'vendor_category', code: 'contractor', label: 'Kontraktor / Jasa', description: 'Jasa konstruksi dan renovasi', sortOrder: 4 },
+  ];
+
+  for (const entry of masterDataEntries) {
+    await prisma.masterData.upsert({
+      where: { category_code: { category: entry.category, code: entry.code } },
+      update: { label: entry.label, description: entry.description, sortOrder: entry.sortOrder },
+      create: { ...entry, isActive: true },
+    });
+  }
+  console.log(`Seeded ${masterDataEntries.length} MasterData entries across 8 categories`);
+
   console.log('Database seeding completed successfully!');
+
 }
 
 main()

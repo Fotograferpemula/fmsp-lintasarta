@@ -33,6 +33,7 @@ export default function AdminView({ isDark, token }: { isDark: boolean; token: s
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [activeCategory, setActiveCategory] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,15 +43,33 @@ export default function AdminView({ isDark, token }: { isDark: boolean; token: s
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const params = activeCategory ? `?category=${activeCategory}` : '';
-      const res = await fetch(`/api/management/admin${params}`, { headers });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const res = await fetch(`/api/management/admin${params}`, { headers, signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setFetchError(errData.error || `Error ${res.status}`);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setItems(data.data);
         if (data.categories) setCategories(data.categories);
+      } else {
+        setFetchError(data.error || 'Gagal memuat data');
       }
-    } catch (e) {}
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        setFetchError('Request timeout — server tidak merespons dalam 10 detik.');
+      } else {
+        setFetchError(e.message || 'Gagal terhubung ke server.');
+      }
+    }
     setLoading(false);
   };
 
@@ -184,8 +203,19 @@ export default function AdminView({ isDark, token }: { isDark: boolean; token: s
                 <th className="px-4 py-3 text-center font-semibold">Aksi</th>
               </tr></thead>
               <tbody>
-                {loading ? <tr><td colSpan={8} className="text-center py-10"><RefreshCw className="w-5 h-5 mx-auto animate-spin text-[#1769FF]" /></td></tr> :
-                filtered.length === 0 ? <tr><td colSpan={8} className={`text-center py-10 ${c_sub}`}>Belum ada data{activeCategory ? ` di kategori "${CATEGORY_LABELS[activeCategory] || activeCategory}"` : ''}. Klik "Tambah Data" untuk memulai.</td></tr> :
+                {loading ? (
+                  <tr><td colSpan={8} className="text-center py-10">
+                    <RefreshCw className="w-5 h-5 mx-auto animate-spin text-[#1769FF]" />
+                    <p className={`text-xs mt-2 ${c_sub}`}>Memuat data...</p>
+                  </td></tr>
+                ) : fetchError ? (
+                  <tr><td colSpan={8} className="text-center py-10">
+                    <p className="text-red-500 text-xs font-semibold">{fetchError}</p>
+                    <button onClick={fetchData} className="mt-2 text-xs text-[#1769FF] hover:underline">Coba lagi</button>
+                  </td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={8} className={`text-center py-10 ${c_sub}`}>Belum ada data{activeCategory ? ` di kategori "${CATEGORY_LABELS[activeCategory] || activeCategory}"` : ''}. Klik "Tambah Data" untuk memulai.</td></tr>
+                ) :
                 filtered.map((item, idx) => (
                   <tr key={item.id} className={`border-t ${c_tbl_r}`}>
                     <td className={`px-4 py-3 ${c_sub}`}>{idx+1}</td>
