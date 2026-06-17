@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────
+// 1. MODEL UTAMA PHASE 1 (OPERASIONAL - SESUAI BRD)
+// ────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         String   @default("viewer") // admin | operator | viewer
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Asset {
+  id                    String              @id @default(cuid())
+  name                  String
+  type                  String              // land | office | facility | vehicle
+  location              String
+  specs                 Json                // Spesifikasi teknis dinamis
+  status                String              @default("good") // good | warning | broken
+  bookValue             Float
+  // Lifecycle fields (merged from AssetLifecycleRecord)
+  purchaseDate          DateTime?           // Tanggal pembelian
+  purchaseCost          Float?              // Harga beli awal
+  expectedLifeYrs       Int?                // Estimasi umur pakai (tahun)
+  lifecycleStatus       String              @default("operational") // operational | depreciated | retired
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  transfers             AssetTransfer[]
+  legalDocuments        LegalDocument[]
+  maintenanceSchedules  MaintenanceSchedule[]
+  workOrders            WorkOrder[]
+
+  @@index([type])
+  @@index([status])
+  @@index([location])
+  @@map("assets")
+}
+
+model AssetTransfer {
+  id            String   @id @default(cuid())
+  assetId       String
+  asset         Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fromLocation  String
+  toLocation    String
+  transferredBy String
+  transferredAt DateTime @default(now())
+  notes         String?
+
+  @@map("asset_transfers")
+}
+
+model LegalDocument {
+  id               String   @id @default(cuid())
+  assetId          String
+  asset            Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  title            String
+  documentType     String   // pbg_imb | slf | certificate | insurance | tax_building | tax_vehicle | fire_protection | elevator_sio | drainage
+  documentUrl      String
+  issueDate        DateTime
+  expiryDate       DateTime
+  complianceStatus String   @default("valid") // valid | warning | expired
+  // PUPR fields (merged from PuprDocument)
+  regNumber        String?  @unique  // Nomor registrasi dokumen PUPR
+  issuingAuthority String?            // "Kemen PUPR", "Pemkot", "Dinas Damkar"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([expiryDate])
+  @@index([complianceStatus])
+  @@index([assetId])
+  @@map("legal_documents")
+}
+
+model Notification {
+  id             String    @id @default(cuid())
+  recipientEmail String
+  type           String    @default("email") // email | dashboard
+  title          String
+  message        String    @db.Text
+  status         String    @default("pending") // pending | sent | failed
+  scheduledAt    DateTime
+  sentAt         DateTime?
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("notifications")
+}
+
+// ────────────────────────────────────────────────────────
+// 2. MODEL PHASE 2B: PREVENTIVE MAINTENANCE & VENDOR
+// ────────────────────────────────────────────────────────
+
+model MaintenanceSchedule {
+  id           String   @id @default(cuid())
+  assetId      String
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  title        String   // "Overhaul AC Presisi", "Kalibrasi UPS"
+  intervalDays Int      // Interval siklus (misal: 90 hari)
+  lastPerformed DateTime
+  nextDue      DateTime
+  assignedTo   String?  // NIP teknisi
+  status       String   @default("scheduled") // scheduled | overdue | completed
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([nextDue])
+  @@index([status])
+  @@map("maintenance_schedules")
+}
+
+model VendorContract {
+  id            String   @id @default(cuid())
+  vendorName    String
+  contractTitle String   // "Kontrak Perawatan Genset", "Sewa Gedung Lantai 3"
+  contractType  String   // maintenance | lease | insurance | service
+  startDate     DateTime
+  endDate       DateTime
+  value         Float    // Nilai kontrak (Rp)
+  pic           String   // Person in charge email
+  status        String   @default("active") // active | expiring | expired | terminated
+  documentUrl   String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([endDate])
+  @@index([status])
+  @@map("vendor_contracts")
+}
+
+// ────────────────────────────────────────────────────────
+// 3. MODEL UNTUK 8 MODUL MANAGEMENT (DATABASE CRUD)
+// ────────────────────────────────────────────────────────
+
+// A. HRD (includes Security Guard — merged)
+model Employee {
+  id           String    @id @default(cuid())
+  nip          String    @unique
+  name         String
+  role         String    // teknisi_mep | operator_bas | cleaning | security | admin | management
+  department   String    // Engineering | Housekeeping | Security | Admin | Management
+  phone        String
+  email        String
+  joinDate     DateTime
+  contractType String    // permanent | pkwt | outsource
+  status       String    @default("active") // active | on_leave | inactive
+  baseSalary   Float
+  skills       String[]
+  // Security-specific fields (merged from SecurityGuard)
+  gadaLevel    String?   // Khusus security: pratama | madya | utama
+  ktaNumber    String?   // Nomor KTA Satpam
+  ktaExpiry    DateTime? // Masa berlaku KTA
+
+  @@index([role])
+  @@index([department])
+  @@map("employees")
+}
+
+// C. Inventory
+model InventoryItem {
+  id            String   @id @default(cuid())
+  sku           String   @unique
+  name          String
+  category      String   // spare_part | electrical | plumbing | safety_ppe | chemical | consumable
+  qty           Int
+  minQty        Int
+  maxQty        Int
+  unit          String   // pcs | box | kg | liter | roll
+  location      String   // Warehouse A, B, etc.
+  unitPrice     Float
+  lastRestocked DateTime @default(now())
+
+  @@map("inventory_items")
+}
+
+// D. SMK3 Safety
+model Smk3Item {
+  id          String   @id @default(cuid())
+  item        String   // APAR | Electrical Control | Scaffold | Structural Pillar
+  location    String
+  lastChecked DateTime
+  status      String   @default("ok") // ok | warning | danger
+  checkedBy   String
+
+  @@map("smk3_items")
+}
+
+// E. Accounting (with RAB relation)
+model AccountingTransaction {
+  id          String     @id @default(cuid())
+  date        DateTime
+  description String
+  type        String     // income | expense
+  amount      Float
+  category    String     // operasional | maintenance | utility | salary | lease
+  rabBudgetId String?    // Link ke anggaran RAB
+  rabBudget   RabBudget? @relation(fields: [rabBudgetId], references: [id])
+
+  @@index([category])
+  @@index([date])
+  @@map("accounting_transactions")
+}
+
+// F. RAB / Anggaran
+model RabBudget {
+  id              String                 @id @default(cuid())
+  year            Int
+  department      String                 // Engineering | Housekeeping | Security | Admin | IT
+  category        String                 // Operasional | Capex | Opex
+  allocatedAmount Float
+  spentAmount     Float
+  transactions    AccountingTransaction[]
+
+  @@map("rab_budgets")
+}
+
+// ────────────────────────────────────────────────────────
+// 4. MODEL PHASE 2D: WORK ORDER / TIKET KERJA
+// ────────────────────────────────────────────────────────
+
+model WorkOrder {
+  id            String    @id @default(cuid())
+  ticketNumber  String    @unique // WO-2026-0001
+  title         String
+  description   String    @db.Text
+  priority      String    // critical | high | medium | low
+  category      String    // hvac | electrical | plumbing | structural | safety
+  assetId       String?
+  asset         Asset?    @relation(fields: [assetId], references: [id])
+  assignedTo    String?   // Employee NIP
+  reportedBy    String    // User email
+  status        String    @default("open") // open | in_progress | resolved | closed
+  slaDeadline   DateTime?
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+  @@map("work_orders")
+}
+
+// ────────────────────────────────────────────────────────
+// 5. MODEL MASA DEPAN (VISI IOT / DCIM / ALARM)
+// ────────────────────────────────────────────────────────
+
+model HardwareDevice {
+  id            String   @id @default(cuid())
+  name          String
+  protocol      String   // bacnet | modbus-tcp | mqtt | rest
+  ipAddress     String?
+  port          Int      @default(502)
+  enabled       Boolean  @default(true)
+  status        String   @default("disconnected") // connected | disconnected | error
+  lastSeen      DateTime?
+  config        Json     @default("{}")
+  subsystem     String   // hvac | energy | fire | water
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("hardware_devices")
+}
+
+model DeviceState {
+  id        String   @id @default(cuid())
+  moduleId  String   // hvac | energy | elevator | ups | chiller
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  @@map("device_states")
+}
+
+model TimeSeries {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime
+  deviceId  String
+  metric    String   // temperature | humidity | power_kw | pue
+  value     Float
+  unit      String
+
+  @@index([deviceId, metric, timestamp])
+  @@map("time_series")
+}
+
+model Alert {
+  id             String    @id @default(cuid())
+  severity       String    // critical | major | minor
+  subsystem      String
+  message        String
+  equipment      String
+  status         String    @default("active") // active | acknowledged | resolved
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@map("alerts")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  user      String
+  action    String
+  resource  String
+  details   String   @default("")
+  ip        String   @default("127.0.0.1")
+
+  @@index([user])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+// ────────────────────────────────────────────────────────
+// MASTER DATA — Kelola jenis fasilitas, tipe aset, lokasi, dll
+// ────────────────────────────────────────────────────────
+model MasterData {
+  id          String   @id @default(cuid())
+  category    String   // e.g. "asset_type", "facility_type", "location", "document_type", "asset_status", "department"
+  code        String   // e.g. "facility", "vehicle", "land", "office"
+  label       String   // e.g. "Fasilitas Kantor", "Kendaraan", "Tanah", "Gedung Kantor"
+  description String   @default("")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([category, code])
+  @@index([category])
+  @@map("master_data")
+}

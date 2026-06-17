@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # ──────── PostgreSQL Database ────────
+  db:
+    image: postgres:16-alpine
+    container_name: fmsp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fmsp_user
+      POSTGRES_PASSWORD: fmsp_password123
+      POSTGRES_DB: fmsp_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fmsp_user -d fmsp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ──────── FMSP Application ────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fmsp-app
+    restart: unless-stopped
+    ports:
+      - "3847:3847"
+    environment:
+      DATABASE_URL: "postgresql://fmsp_user:fmsp_password123@db:5432/fmsp_db?schema=public"
+      PORT: "3847"
+      NODE_ENV: "production"
+      JWT_SECRET: "fmsp-lintasarta-jwt-secret-change-me-in-production"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    driver: local

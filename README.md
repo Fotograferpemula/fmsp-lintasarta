@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FMSP Lintasarta — Facility Management System Platform
 
-## Getting Started
+> Sistem manajemen fasilitas terpadu berbasis web untuk PT Lintasarta, dibangun dengan Next.js 16, Prisma ORM, dan PostgreSQL.
 
-First, run the development server:
+## 🚀 Tech Stack
+
+| Layer | Teknologi |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Database | PostgreSQL + Prisma ORM |
+| Auth | JWT + bcrypt |
+| UI | Tailwind CSS + lucide-react |
+| Deploy | Fly.io |
+
+## 🏗️ Fitur Utama (Phase 1)
+
+- **Dashboard Storytelling** — KPI, horizontal bar charts, compliance timeline
+- **Manajemen Aset** — CRUD aset fisik + mutasi lokasi + lifecycle tracking
+- **Perizinan & Legal** — Dokumen legal dengan reminder otomatis
+- **HRD & Security** — Data karyawan dan petugas keamanan
+- **Inventory** — Stock barang operasional
+- **SMK3 Safety** — Inspeksi keselamatan kerja
+- **Keuangan** — Accounting & RAB
+- **Preventive Maintenance** — Jadwal pemeliharaan
+- **Vendor & Contract** — Manajemen kontrak vendor
+- **Work Order** — Tiket pekerjaan
+- **Audit Log** — Catatan aktivitas sistem (admin only)
+- **Admin Master Data** — Kelola jenis fasilitas, tipe aset, lokasi, dll
+
+## ⚙️ Setup Development
+
+### Prerequisites
+- Node.js 20+
+- PostgreSQL 15+
+- npm
+
+### Install
 
 ```bash
+# Clone repository
+git clone <repo-url>
+cd fmsp-lintasarta
+
+# Install dependencies
+npm install
+
+# Setup environment
+cp .env.example .env
+# Edit .env dengan DATABASE_URL yang sesuai
+
+# Setup database
+npx prisma db push
+npx prisma db seed
+
+# Jalankan development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3847](http://localhost:3847)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Login default:**
+- Email: `admin@lintasarta.co.id` / Password: `admin123`
+- Email: `operator@lintasarta.co.id` / Password: `operator123`
+- Email: `viewer@lintasarta.co.id` / Password: `viewer123`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🐳 Docker
 
-## Learn More
+```bash
+# Build image
+docker build -t fmsp-lintasarta .
 
-To learn more about Next.js, take a look at the following resources:
+# Jalankan dengan docker compose (include PostgreSQL)
+docker compose up -d
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## ☁️ Deploy ke Fly.io
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Login fly
+flyctl auth login
 
-## Deploy on Vercel
+# Buat PostgreSQL database
+flyctl postgres create --name fmsp-db --region sin
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Attach database ke app
+flyctl postgres attach fmsp-db
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Deploy
+flyctl deploy
+```
+
+## 📁 Struktur Project
+
+```
+src/
+├── app/
+│   ├── api/           # API routes (REST)
+│   │   ├── assets/
+│   │   ├── legal-documents/
+│   │   ├── management/
+│   │   └── auth/
+│   ├── page.tsx       # Main dashboard page
+│   └── layout.tsx
+├── components/
+│   └── management/    # Modul-modul management
+└── lib/
+    ├── db.ts          # Prisma client singleton
+    ├── auth-middleware.ts
+    └── rbac-middleware.ts
+prisma/
+├── schema.prisma      # Database schema
+└── seed.ts            # Data seeder
+```
+
+## 🔒 Role Akses
+
+| Role | Akses |
+|---|---|
+| `admin` | Full CRUD semua modul + Audit Log + Admin Master Data |
+| `operator` | Read + Write operasional (tanpa delete) |
+| `viewer` | Read only |
+
+---
+
+*Developed for PT Lintasarta — General Affairs Division*
