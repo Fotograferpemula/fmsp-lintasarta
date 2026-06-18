@@ -1031,16 +1031,37 @@ export default function Home() {
                           }
                         </p>
                       </div>
-                      <div className="flex gap-6 shrink-0">
+                      <div className="flex flex-col sm:flex-row gap-6 shrink-0 items-center">
                         <div className="text-center">
                           <p className={`text-3xl font-bold ${complianceRate >= 90 ? 'text-emerald-600' : complianceRate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>{complianceRate}%</p>
                           <p className={`text-[10px] font-semibold uppercase tracking-wider mt-1 ${c_text_sub}`}>Kepatuhan Legal</p>
                         </div>
-                        <div className={`w-px ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                        <div className={`w-px hidden sm:block ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
                         <div className="text-center">
                           <p className={`text-3xl font-bold ${pendingNotifications > 0 ? 'text-amber-500' : `${c_text_title}`}`}>{pendingNotifications}</p>
                           <p className={`text-[10px] font-semibold uppercase tracking-wider mt-1 ${c_text_sub}`}>Alert Pending</p>
                         </div>
+                        <div className={`w-px hidden sm:block ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                        {/* PDF Report Download */}
+                        <button
+                          onClick={() => {
+                            const token = authToken;
+                            const url = `/api/reports/compliance?format=html`;
+                            const win = window.open('', '_blank');
+                            if (!win) return;
+                            fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+                              .then(r => r.text())
+                              .then(html => {
+                                win.document.write(html);
+                                win.document.close();
+                              });
+                          }}
+                          className="flex flex-col items-center gap-1 px-4 py-2.5 bg-[#1769FF]/10 hover:bg-[#1769FF]/20 border border-[#1769FF]/30 text-[#1769FF] rounded-xl transition-all text-xs font-semibold"
+                          title="Download Laporan Compliance Bulanan"
+                        >
+                          <span className="text-lg">📄</span>
+                          <span>Laporan PDF</span>
+                        </button>
                       </div>
                     </div>
                   </div>
