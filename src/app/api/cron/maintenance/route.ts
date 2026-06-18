@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     });
 
     const admins = await prisma.user.findMany({
-      where: { role: 'admin' },
+      where: { role: { in: ['superadmin', 'manager_fms', 'admin_pusat'] }, isActive: true },
       select: { email: true },
     });
 

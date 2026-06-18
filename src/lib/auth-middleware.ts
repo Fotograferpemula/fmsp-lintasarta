@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import { hasPermission, PermissionKey } from './rbac';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fmsp-lintasarta-secret-key-change-in-production-2026';
 const JWT_EXPIRES_IN = '8h';
@@ -9,6 +10,7 @@ export interface JWTPayload {
   email: string;
   role: string;
   name: string;
+  region?: string; // Region/lokasi untuk filter (admin_regional, admin_lokasi)
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -69,4 +71,20 @@ export function withAuth(
     (req as AuthenticatedRequest).user = user;
     return handler(req as AuthenticatedRequest, user);
   };
+}
+
+// Auth middleware with permission check
+export function withRole(
+  permission: PermissionKey,
+  handler: (req: AuthenticatedRequest, user: JWTPayload) => Promise<NextResponse>
+) {
+  return withAuth(async (req, user) => {
+    if (!hasPermission(user.role, permission)) {
+      return NextResponse.json(
+        { success: false, error: `Forbidden: Anda tidak memiliki akses untuk fitur ini. Diperlukan permission: ${permission}` },
+        { status: 403 }
+      );
+    }
+    return handler(req, user);
+  });
 }

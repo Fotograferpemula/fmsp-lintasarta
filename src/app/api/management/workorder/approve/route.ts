@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { withAuth, JWTPayload, AuthenticatedRequest } from '@/lib/auth-middleware';
+import { withRole, JWTPayload, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { sendEmail } from '@/lib/email-service';
+import { getRoleConfig } from '@/lib/rbac';
 
 // POST /api/management/workorder/approve
 // Body: { id, action: 'approve'|'reject', reason? }
 async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
-  // Only admin and operator can approve
-  if (!['admin', 'operator'].includes(user.role)) {
-    return NextResponse.json({ success: false, error: 'Akses ditolak — hanya admin dan operator' }, { status: 403 });
-  }
+  // Permission already checked by withRole('wo_approve')
 
   const body = await req.json();
   const { id, action, reason } = body;
@@ -123,4 +121,4 @@ Akses FMSP untuk melihat detail lebih lanjut.
   });
 }
 
-export const POST = withAuth(handlePost);
+export const POST = withRole('wo_approve', handlePost);

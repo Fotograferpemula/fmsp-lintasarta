@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { generateToken } from '@/lib/auth-middleware';
 import { LoginSchema, validateRequest } from '@/lib/validators';
+import { getRoleConfig } from '@/lib/rbac';
 
 export async function POST(req: Request) {
   try {
@@ -40,6 +41,14 @@ export async function POST(req: Request) {
       );
     }
 
+    // Check if user is active
+    if (!user.isActive) {
+      return NextResponse.json(
+        { success: false, error: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' },
+        { status: 403 }
+      );
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
@@ -57,12 +66,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate JWT
+    // Generate JWT (include region for scoped access)
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: user.role,
       name: user.name,
+      region: user.region || undefined,
     });
 
     // Log successful login
@@ -85,6 +95,8 @@ export async function POST(req: Request) {
           email: user.email,
           name: user.name,
           role: user.role,
+          region: user.region,
+          roleLabel: getRoleConfig(user.role).label,
         },
       },
     });

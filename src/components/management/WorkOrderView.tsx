@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { ClipboardList, Plus, Trash2, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { hasPermission } from '@/lib/rbac';
 
 interface WorkOrderItem {
   id: string; ticketNumber: string; title: string; description: string;
@@ -40,7 +41,8 @@ export default function WorkOrderView({ isDark, token, currentUserRole = 'viewer
   const [approvalLoading, setApprovalLoading] = useState(false);
 
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
-  const canApprove = ['admin', 'operator'].includes(currentUserRole);
+  const canApprove = hasPermission(currentUserRole, 'wo_approve');
+  const canDelete  = hasPermission(currentUserRole, 'delete_data');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -237,7 +239,7 @@ export default function WorkOrderView({ isDark, token, currentUserRole = 'viewer
                           ><XCircle className="w-4 h-4" /></button>
                         </>
                       )}
-                      {canApprove && (
+                      {canDelete && (
                         <button onClick={() => handleDelete(item.id)} title="Hapus"
                           className={`p-1.5 rounded-lg transition-colors hover:bg-red-500/10 ${c_sub} hover:text-red-400`}>
                           <Trash2 className="w-3.5 h-3.5" />

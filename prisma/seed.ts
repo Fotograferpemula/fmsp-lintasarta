@@ -24,26 +24,80 @@ async function main() {
   await prisma.maintenanceSchedule.deleteMany({});
   await prisma.vendorContract.deleteMany({});
 
-  // 2. Create Users
-  const admin = await prisma.user.create({
+  // 2. Create Users (6-tier RBAC)
+  const bcryptHash = '$2b$10$TA2McBvTqbg30o8mTDdgNueigSu4CMRGUyMkYllEC6PJ38w9.fhz.'; // admin123
+
+  const superadmin = await prisma.user.create({
     data: {
-      email: 'admin@lintasarta.co.id',
-      name: 'Lintasarta Admin FM',
-      role: 'admin',
-      passwordHash: '$2b$10$TA2McBvTqbg30o8mTDdgNueigSu4CMRGUyMkYllEC6PJ38w9.fhz.', // admin123 (admin123)
+      email: 'superadmin@lintasarta.co.id',
+      name: 'System SuperAdmin',
+      role: 'superadmin',
+      department: 'IT',
+      passwordHash: bcryptHash,
     },
   });
 
-  const operator = await prisma.user.create({
+  const manager = await prisma.user.create({
+    data: {
+      email: 'manager@lintasarta.co.id',
+      name: 'Budi Santoso',
+      role: 'manager_fms',
+      department: 'FM',
+      passwordHash: bcryptHash,
+    },
+  });
+
+  const adminPusat = await prisma.user.create({
+    data: {
+      email: 'admin@lintasarta.co.id',
+      name: 'Lintasarta Admin Pusat',
+      role: 'admin_pusat',
+      department: 'FM',
+      passwordHash: bcryptHash,
+    },
+  });
+
+  const adminRegional = await prisma.user.create({
+    data: {
+      email: 'regional.jatiluhur@lintasarta.co.id',
+      name: 'Andi Prasetyo',
+      role: 'admin_regional',
+      department: 'FM',
+      region: 'Jatiluhur, Purwakarta, Jawa Barat',
+      passwordHash: bcryptHash,
+    },
+  });
+
+  const adminLokasi = await prisma.user.create({
+    data: {
+      email: 'lokasi.dc1@lintasarta.co.id',
+      name: 'Dewi Lestari',
+      role: 'admin_lokasi',
+      department: 'FM',
+      region: 'Data Center Lantai 1, Jatiluhur',
+      passwordHash: bcryptHash,
+    },
+  });
+
+  const userBiasa = await prisma.user.create({
     data: {
       email: 'operator@lintasarta.co.id',
       name: 'FMSP Operator',
-      role: 'operator',
-      passwordHash: '$2b$10$TA2McBvTqbg30o8mTDdgNueigSu4CMRGUyMkYllEC6PJ38w9.fhz.', // admin123
+      role: 'user',
+      department: 'Engineering',
+      region: 'Jatiluhur, Purwakarta, Jawa Barat',
+      passwordHash: bcryptHash,
     },
   });
 
-  console.log('Created Users:', { admin: admin.email, operator: operator.email });
+  console.log('Created 6 Users (RBAC):', {
+    superadmin: superadmin.email,
+    manager: manager.email,
+    adminPusat: adminPusat.email,
+    adminRegional: adminRegional.email,
+    adminLokasi: adminLokasi.email,
+    user: userBiasa.email,
+  });
 
   // 3. Create Assets
   const asset1 = await prisma.asset.create({

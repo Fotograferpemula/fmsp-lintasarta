@@ -56,6 +56,7 @@ import AuditLogView from '@/components/management/AuditLogView';
 import AdminView from '@/components/management/AdminView';
 import UserManagementView from '@/components/management/UserManagementView';
 import AnalyticsView from '@/components/management/AnalyticsView';
+import { hasPermission, getRoleConfig, type PermissionKey } from '@/lib/rbac';
 
 // Tipe data berdasarkan model Prisma
 interface Asset {
@@ -118,7 +119,7 @@ export default function Home() {
   const [mfaTimer, setMfaTimer] = useState(5);
   const [authToken, setAuthToken] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string; region?: string; roleLabel?: string } | null>(null);
 
   // State Tema Terang / Gelap
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
@@ -873,7 +874,7 @@ export default function Home() {
             <div className="pt-4 pb-2 px-4">
               <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Integration</span>
             </div>
-            {currentUser?.role === 'admin' && (
+            {currentUser && hasPermission(currentUser.role, 'audit_log_view') && (
               <button 
                 onClick={() => setActiveTab('auditlog')}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'auditlog' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
@@ -882,7 +883,7 @@ export default function Home() {
                 Audit Log
               </button>
             )}
-            {currentUser?.role === 'admin' && (
+            {currentUser && hasPermission(currentUser.role, 'user_manage') && (
               <button 
                 onClick={() => setActiveTab('users')}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'users' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
@@ -891,7 +892,7 @@ export default function Home() {
                 Manajemen User
               </button>
             )}
-            {currentUser?.role === 'admin' && (
+            {currentUser && hasPermission(currentUser.role, 'master_data') && (
               <button 
                 onClick={() => setActiveTab('admin')}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'admin' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
@@ -913,6 +914,17 @@ export default function Home() {
               <div className="overflow-hidden">
                 <h4 className={`text-xs font-bold truncate w-28 ${c_text_title}`}>{currentUser?.name || 'Admin FM'}</h4>
                 <p className="text-[10px] text-zinc-500 truncate w-28">{currentUser?.email || 'admin@lintasarta.co.id'}</p>
+                {currentUser && (
+                  <span 
+                    className="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ 
+                      color: getRoleConfig(currentUser.role).color, 
+                      backgroundColor: getRoleConfig(currentUser.role).bgColor 
+                    }}
+                  >
+                    {currentUser.roleLabel || getRoleConfig(currentUser.role).label}
+                  </span>
+                )}
               </div>
             </div>
             <button 
@@ -1384,7 +1396,7 @@ export default function Home() {
                           <p className={`text-xs font-bold ${c_text_title}`}>Aktivitas terkini</p>
                           <p className={`text-[11px] mt-0.5 ${c_text_sub}`}>Catatan perubahan data terakhir di sistem</p>
                         </div>
-                        {currentUser?.role === 'admin' && (
+                        {currentUser && hasPermission(currentUser.role, 'audit_log_view') && (
                           <button onClick={() => setActiveTab('auditlog')} className="text-[11px] text-[#1769FF] hover:underline font-semibold">Audit Log →</button>
                         )}
                       </div>
@@ -1773,6 +1785,7 @@ export default function Home() {
                 token={authToken}
                 isDark={isDark}
                 currentUserEmail={currentUser?.email || ''}
+                currentUserRole={currentUser?.role || 'user'}
               />
             )}
             {activeTab === 'analytics' && (

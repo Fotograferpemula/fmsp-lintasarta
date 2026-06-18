@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Ambil semua admin & operator untuk notifikasi
     const recipients = await prisma.user.findMany({
-      where: { role: { in: ['admin', 'operator'] } },
+      where: { role: { in: ['superadmin', 'manager_fms', 'admin_pusat', 'admin_regional'] }, isActive: true },
       select: { email: true, name: true },
     });
 

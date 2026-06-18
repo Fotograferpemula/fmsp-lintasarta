@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Users, UserPlus, Shield, Eye, Edit3, UserX, UserCheck,
-  Search, X, ChevronDown, RefreshCw, Phone, Building2,
+  Search, X, ChevronDown, RefreshCw, Phone, Building2, MapPin,
 } from 'lucide-react';
+import { ROLES, ROLE_NAMES, getRoleConfig, canManageRole, getAssignableRoles, type RoleName } from '@/lib/rbac';
 
 interface User {
   id: string;
@@ -14,6 +15,7 @@ interface User {
   isActive: boolean;
   department?: string;
   phone?: string;
+  region?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,19 +24,23 @@ interface Props {
   token: string;
   isDark: boolean;
   currentUserEmail: string;
+  currentUserRole: string;
 }
 
-const ROLE_LABELS: Record<string, { label: string; color: string; icon: string }> = {
-  admin:    { label: 'Admin',    color: 'bg-red-500/10 text-red-400 border-red-500/20',    icon: '🛡️' },
-  operator: { label: 'Operator', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: '⚙️' },
-  viewer:   { label: 'Viewer',   color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20', icon: '👁️' },
+const ROLE_ICONS: Record<string, string> = {
+  superadmin: '👑',
+  manager_fms: '📊',
+  admin_pusat: '🛡️',
+  admin_regional: '🌍',
+  admin_lokasi: '📍',
+  user: '👤',
 };
 
 const EMPTY_FORM = {
-  name: '', email: '', role: 'viewer', password: '', department: '', phone: '',
+  name: '', email: '', role: 'user', password: '', department: '', phone: '', region: '',
 };
 
-export default function UserManagementView({ token, isDark, currentUserEmail }: Props) {
+export default function UserManagementView({ token, isDark, currentUserEmail, currentUserRole }: Props) {
   const [users, setUsers]           = useState<User[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -49,6 +55,9 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
   const [formError, setFormError]   = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState<{ userId: string; userName: string; deactivate: boolean } | null>(null);
+
+  // Assignable roles for current user
+  const assignableRoles = getAssignableRoles(currentUserRole);
 
   // Color shortcuts
   const c = {
@@ -80,14 +89,14 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ ...EMPTY_FORM });
+    setForm({ ...EMPTY_FORM, role: assignableRoles[assignableRoles.length - 1] || 'user' });
     setFormError('');
     setShowModal(true);
   };
 
   const openEdit = (u: User) => {
     setEditUser(u);
-    setForm({ name: u.name, email: u.email, role: u.role, password: '', department: u.department || '', phone: u.phone || '' });
+    setForm({ name: u.name, email: u.email, role: u.role, password: '', department: u.department || '', phone: u.phone || '', region: u.region || '' });
     setFormError('');
     setShowModal(true);
   };
@@ -98,8 +107,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
     setSubmitting(true);
     try {
       if (editUser) {
-        // Update
-        const body: any = { id: editUser.id, name: form.name, role: form.role, department: form.department, phone: form.phone };
+        const body: any = { id: editUser.id, name: form.name, role: form.role, department: form.department, phone: form.phone, region: form.region };
         if (form.password) body.newPassword = form.password;
         const r = await fetch('/api/management/users', {
           method: 'PATCH',
@@ -109,7 +117,6 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
         const data = await r.json();
         if (!data.success) { setFormError(data.error); return; }
       } else {
-        // Create
         const r = await fetch('/api/management/users', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -127,7 +134,6 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
   const handleToggleActive = async (userId: string, activate: boolean) => {
     try {
       if (!activate) {
-        // Deactivate
         const r = await fetch(`/api/management/users?id=${userId}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
@@ -135,7 +141,6 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
         const data = await r.json();
         if (!data.success) { alert(data.error); return; }
       } else {
-        // Reactivate
         const r = await fetch('/api/management/users', {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -152,19 +157,18 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
   const filtered = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
                         u.email.toLowerCase().includes(search.toLowerCase()) ||
-                        u.department?.toLowerCase().includes(search.toLowerCase());
+                        u.department?.toLowerCase().includes(search.toLowerCase()) ||
+                        u.region?.toLowerCase().includes(search.toLowerCase());
     const matchRole = filterRole === 'all' || u.role === filterRole;
     const matchActive = showInactive ? true : u.isActive;
     return matchSearch && matchRole && matchActive;
   });
 
-  const stats = {
-    total:    users.length,
-    admin:    users.filter(u => u.role === 'admin' && u.isActive).length,
-    operator: users.filter(u => u.role === 'operator' && u.isActive).length,
-    viewer:   users.filter(u => u.role === 'viewer' && u.isActive).length,
-    inactive: users.filter(u => !u.isActive).length,
-  };
+  // Group stats by role
+  const roleCounts = ROLE_NAMES.reduce((acc, r) => {
+    acc[r] = users.filter(u => u.role === r && u.isActive).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="space-y-6 p-6">
@@ -173,7 +177,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className={`text-lg font-bold ${c.text}`}>Manajemen Pengguna</h2>
-            <p className={`text-xs mt-1 ${c.sub}`}>Kelola akun, role, dan akses pengguna FMSP</p>
+            <p className={`text-xs mt-1 ${c.sub}`}>Kelola akun, role, dan akses pengguna FMSP — RBAC 6 tingkat</p>
           </div>
           <button
             onClick={openCreate}
@@ -184,20 +188,23 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-          {[
-            { label: 'Total User',  value: stats.total,    icon: '👥', color: 'text-[#1769FF]' },
-            { label: 'Admin',       value: stats.admin,    icon: '🛡️', color: 'text-red-400' },
-            { label: 'Operator',    value: stats.operator, icon: '⚙️', color: 'text-blue-400' },
-            { label: 'Non-aktif',   value: stats.inactive, icon: '🚫', color: 'text-zinc-400' },
-          ].map(s => (
-            <div key={s.label} className={`rounded-xl border p-3 text-center ${c.inner}`}>
-              <p className="text-xl">{s.icon}</p>
-              <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-              <p className={`text-[10px] mt-0.5 ${c.sub}`}>{s.label}</p>
-            </div>
-          ))}
+        {/* Stats — show all roles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mt-5">
+          <div className={`rounded-xl border p-3 text-center ${c.inner}`}>
+            <p className="text-xl">👥</p>
+            <p className={`text-2xl font-bold mt-1 text-[#1769FF]`}>{users.length}</p>
+            <p className={`text-[9px] mt-0.5 ${c.sub}`}>Total</p>
+          </div>
+          {ROLE_NAMES.map(r => {
+            const rc = getRoleConfig(r);
+            return (
+              <div key={r} className={`rounded-xl border p-3 text-center ${c.inner}`}>
+                <p className="text-lg">{ROLE_ICONS[r]}</p>
+                <p className="text-2xl font-bold mt-1" style={{ color: rc.color }}>{roleCounts[r] || 0}</p>
+                <p className={`text-[9px] mt-0.5 ${c.sub}`}>{rc.label}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -206,7 +213,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
-            type="text" placeholder="Cari nama, email, departemen..."
+            type="text" placeholder="Cari nama, email, departemen, region..."
             value={search} onChange={e => setSearch(e.target.value)}
             className={`w-full pl-9 pr-3 py-2 rounded-xl border text-sm outline-none focus:border-[#1769FF] transition-colors ${c.input}`}
           />
@@ -216,9 +223,9 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
           className={`px-3 py-2 rounded-xl border text-sm outline-none ${c.input}`}
         >
           <option value="all">Semua Role</option>
-          <option value="admin">Admin</option>
-          <option value="operator">Operator</option>
-          <option value="viewer">Viewer</option>
+          {ROLE_NAMES.map(r => (
+            <option key={r} value={r}>{ROLE_ICONS[r]} {getRoleConfig(r).label}</option>
+          ))}
         </select>
         <label className={`flex items-center gap-2 text-xs cursor-pointer ${c.sub}`}>
           <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="rounded" />
@@ -241,8 +248,8 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
                 <tr className={`text-xs font-semibold uppercase tracking-wider ${c.th}`}>
                   <th className="py-3 px-4 text-left">Pengguna</th>
                   <th className="py-3 px-4 text-left hidden sm:table-cell">Role</th>
-                  <th className="py-3 px-4 text-left hidden md:table-cell">Departemen</th>
-                  <th className="py-3 px-4 text-left hidden lg:table-cell">Dibuat</th>
+                  <th className="py-3 px-4 text-left hidden md:table-cell">Region</th>
+                  <th className="py-3 px-4 text-left hidden lg:table-cell">Departemen</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
@@ -266,15 +273,20 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
                   </tr>
                 ) : (
                   filtered.map(u => {
-                    const roleInfo = ROLE_LABELS[u.role] || ROLE_LABELS.viewer;
+                    const rc = getRoleConfig(u.role);
                     const isSelf = u.email === currentUserEmail;
+                    const canManage = canManageRole(currentUserRole, u.role) && !isSelf;
                     return (
                       <tr key={u.id} className={`transition-colors ${c.hover}`}>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                              u.isActive ? 'bg-[#1769FF]/15 text-[#1769FF]' : 'bg-zinc-500/10 text-zinc-500'
-                            }`}>
+                            <div 
+                              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0`}
+                              style={{ 
+                                backgroundColor: u.isActive ? rc.bgColor : 'rgba(113,113,122,0.1)',
+                                color: u.isActive ? rc.color : '#71717a',
+                              }}
+                            >
                               {u.name.charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
@@ -286,15 +298,25 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
                           </div>
                         </td>
                         <td className="py-3 px-4 hidden sm:table-cell">
-                          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${roleInfo.color}`}>
-                            {roleInfo.icon} {roleInfo.label}
+                          <span 
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border"
+                            style={{ color: rc.color, backgroundColor: rc.bgColor, borderColor: rc.color + '30' }}
+                          >
+                            {ROLE_ICONS[u.role] || '👤'} {rc.label}
                           </span>
                         </td>
                         <td className={`py-3 px-4 text-xs hidden md:table-cell ${c.sub}`}>
-                          {u.department || <span className="italic opacity-50">—</span>}
+                          {u.region ? (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-emerald-400" />
+                              <span className="truncate max-w-[140px]">{u.region}</span>
+                            </span>
+                          ) : (
+                            <span className="italic opacity-50">Global</span>
+                          )}
                         </td>
                         <td className={`py-3 px-4 text-xs hidden lg:table-cell ${c.sub}`}>
-                          {new Date(u.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {u.department || <span className="italic opacity-50">—</span>}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -307,14 +329,16 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => openEdit(u)}
-                              title="Edit"
-                              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            {!isSelf && (
+                            {(canManage || isSelf) && (
+                              <button
+                                onClick={() => openEdit(u)}
+                                title="Edit"
+                                className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {canManage && (
                               <button
                                 onClick={() => setShowConfirm({ userId: u.id, userName: u.name, deactivate: u.isActive })}
                                 title={u.isActive ? 'Nonaktifkan' : 'Aktifkan kembali'}
@@ -355,7 +379,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
               <button onClick={() => setShowModal(false)} className={`text-xs font-medium ${c.sub} hover:text-red-400 transition-colors`}>✕ Tutup</button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm max-h-[70vh] overflow-y-auto">
               {/* Name */}
               <div>
                 <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>Nama Lengkap *</label>
@@ -372,15 +396,31 @@ export default function UserManagementView({ token, isDark, currentUserEmail }: 
                   className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm ${editUser ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#1769FF]'} transition-colors ${c.input}`} />
               </div>
 
-              {/* Role */}
+              {/* Role — 6 tier */}
               <div>
                 <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>Role *</label>
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                   className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm ${c.input}`}>
-                  <option value="viewer">👁️ Viewer — hanya baca</option>
-                  <option value="operator">⚙️ Operator — input + WO</option>
-                  <option value="admin">🛡️ Admin — akses penuh</option>
+                  {assignableRoles.map(r => {
+                    const rc = getRoleConfig(r);
+                    return (
+                      <option key={r} value={r}>
+                        {ROLE_ICONS[r]} {rc.label} — {rc.description}
+                      </option>
+                    );
+                  })}
                 </select>
+              </div>
+
+              {/* Region */}
+              <div>
+                <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>
+                  Region / Lokasi
+                  <span className={`font-normal ml-1 ${c.sub}`}>(wajib untuk Admin Regional & Admin Lokasi)</span>
+                </label>
+                <input type="text" value={form.region} onChange={e => setForm(f => ({ ...f, region: e.target.value }))}
+                  placeholder="contoh: Jatiluhur, Purwakarta, Jawa Barat"
+                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm transition-colors ${c.input}`} />
               </div>
 
               {/* Department + Phone */}

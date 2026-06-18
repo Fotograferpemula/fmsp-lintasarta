@@ -15,11 +15,12 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
-  role         String   @default("viewer") // admin | operator | viewer
+  role         String   @default("user") // superadmin | manager_fms | admin_pusat | admin_regional | admin_lokasi | user
   passwordHash String
   isActive     Boolean  @default(true)
   department   String?  // e.g. FM, IT, HR
   phone        String?
+  region       String?  // Region/lokasi untuk filter data (admin_regional, admin_lokasi)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
