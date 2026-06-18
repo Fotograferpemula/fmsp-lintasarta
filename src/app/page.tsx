@@ -54,6 +54,7 @@ import VendorView from '@/components/management/VendorView';
 import WorkOrderView from '@/components/management/WorkOrderView';
 import AuditLogView from '@/components/management/AuditLogView';
 import AdminView from '@/components/management/AdminView';
+import UserManagementView from '@/components/management/UserManagementView';
 
 // Tipe data berdasarkan model Prisma
 interface Asset {
@@ -123,7 +124,7 @@ export default function Home() {
   const isDark = theme === 'dark';
 
   // State Utama Aplikasi
-  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin' | 'users'>('overview');
   // Sub-tab states for consolidated menus
   const [assetSubTab, setAssetSubTab] = useState<'aset' | 'legal'>('aset');
   const [hrdSubTab, setHrdSubTab] = useState<'karyawan' | 'security'>('karyawan');
@@ -144,6 +145,11 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pwaPrompt, setPwaPrompt] = useState<any>(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
+
+  // SSE Notification badge
+  const [notifBadge, setNotifBadge] = useState(0);
+  const [sseNotifs, setSseNotifs] = useState<{ id: string; title: string; message: string; timestamp: string }[]>([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   // Modal State
   const [showAssetModal, setShowAssetModal] = useState(false);
@@ -249,6 +255,24 @@ export default function Home() {
   useEffect(() => {
     setSidebarOpen(false);
   }, [activeTab]);
+
+  // SSE — real-time notification stream
+  useEffect(() => {
+    if (!isAuthenticated || !authToken) return;
+    const url = `/api/notifications/stream?token=${encodeURIComponent(authToken)}`;
+    const es = new EventSource(url);
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'badge') setNotifBadge(d.count);
+        if (d.type === 'notification') {
+          setSseNotifs(prev => [d, ...prev].slice(0, 10));
+          setNotifBadge(c => c + 1);
+        }
+      } catch {}
+    };
+    return () => es.close();
+  }, [isAuthenticated, authToken]);
 
   // Simulasi MFA Microsoft Authenticator
   useEffect(() => {
@@ -847,6 +871,15 @@ export default function Home() {
             )}
             {currentUser?.role === 'admin' && (
               <button 
+                onClick={() => setActiveTab('users')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'users' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                Manajemen User
+              </button>
+            )}
+            {currentUser?.role === 'admin' && (
+              <button 
                 onClick={() => setActiveTab('admin')}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'admin' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
               >
@@ -914,11 +947,52 @@ export default function Home() {
             {activeTab === 'workorder' && 'Work Order & Ticket Management'}
             {activeTab === 'auditlog' && 'Audit Log — Catatan Aktivitas'}
             {activeTab === 'admin' && 'Admin — Master Data Management'}
+            {activeTab === 'users' && 'Manajemen Pengguna'}
           </h1>
           </div>{/* end hamburger+title */}
 
           <div className="flex items-center gap-2 md:gap-4">
             
+            {/* Bell Notification dengan SSE badge */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowNotifDropdown(s => !s); if (notifBadge > 0) setNotifBadge(0); }}
+                className={`relative p-2 rounded-xl border transition-all ${isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'}`}
+                aria-label="Notifikasi"
+              >
+                <Bell className="w-4 h-4" />
+                {notifBadge > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                    {notifBadge > 9 ? '9+' : notifBadge}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifDropdown && (
+                <div className={`absolute right-0 top-11 w-80 rounded-2xl border shadow-2xl z-50 overflow-hidden ${isDark ? 'bg-[#0F1C33] border-[#1A2744]' : 'bg-white border-[#E0E8F5]'}`}>
+                  <div className={`px-4 py-3 border-b flex items-center justify-between ${isDark ? 'border-[#1A2744]' : 'border-[#E0E8F5]'}`}>
+                    <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-zinc-800'}`}>Notifikasi Terbaru</span>
+                    <button onClick={() => { setShowNotifDropdown(false); setActiveTab('notifications'); }}
+                      className="text-[10px] text-[#1769FF] font-semibold">Lihat Semua</button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y" style={{ borderColor: isDark ? '#1A2744' : '#E0E8F5' }}>
+                    {sseNotifs.length === 0 ? (
+                      <p className={`text-xs text-center py-6 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>Tidak ada notifikasi baru</p>
+                    ) : sseNotifs.map(n => (
+                      <div key={n.id} className={`px-4 py-3 text-xs ${isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'}`}>
+                        <p className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-800'}`}>{n.title}</p>
+                        <p className={`mt-0.5 line-clamp-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{n.message}</p>
+                        <p className="mt-1 text-[10px] text-zinc-500">
+                          {n.timestamp ? new Date(n.timestamp).toLocaleString('id-ID') : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* BUTTON TOGGLE TEMA (TERANG / GELAP) */}
             <button 
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
@@ -1673,13 +1747,20 @@ export default function Home() {
             {activeTab === 'vendor' && <VendorView isDark={isDark} token={authToken} />}
 
             {/* ────────── TAB 15: WORK ORDER / TICKET ────────── */}
-            {activeTab === 'workorder' && <WorkOrderView isDark={isDark} token={authToken} />}
+            {activeTab === 'workorder' && <WorkOrderView isDark={isDark} token={authToken} currentUserRole={currentUser?.role || 'viewer'} />}
 
             {/* ────────── TAB 16: AUDIT LOG ────────── */}
             {activeTab === 'auditlog' && <AuditLogView isDark={isDark} token={authToken} />}
 
             {/* ────────── TAB 17: ADMIN MASTER DATA ────────── */}
             {activeTab === 'admin' && <AdminView isDark={isDark} token={authToken} />}
+            {activeTab === 'users' && (
+              <UserManagementView
+                token={authToken}
+                isDark={isDark}
+                currentUserEmail={currentUser?.email || ''}
+              />
+            )}
 
           </div>
         )}
