@@ -493,14 +493,53 @@ export default function Home() {
   };
 
   // Generate QR Code for Asset
-  const handleShowQR = async (assetId: string) => {
+  const handleShowQR = async (asset: Asset) => {
     try {
       const { generateAssetQRCode } = await import('@/lib/qr-service');
-      const dataUrl = await generateAssetQRCode(assetId, '');
+      const dataUrl = await generateAssetQRCode(asset.id, asset.name);
       setQrDataUrl(dataUrl);
+      setSelectedAsset(asset);
       setShowQrModal(true);
     } catch (err) { console.error(err); }
   };
+
+  const handleDownloadQR = () => {
+    if (!qrDataUrl || !selectedAsset) return;
+    const link = document.createElement('a');
+    link.href = qrDataUrl;
+    link.download = `QR-${selectedAsset.name.replace(/\s+/g, '_')}.png`;
+    link.click();
+  };
+
+  const handlePrintQR = () => {
+    if (!qrDataUrl || !selectedAsset) return;
+    const code = `FMSP-${selectedAsset.id.slice(-8).toUpperCase()}`;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Label QR Aset</title>
+      <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        .label { width: 300px; border: 2px solid #1769FF; border-radius: 8px; padding: 16px; text-align: center; }
+        .logo { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+        .name { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+        .location { font-size: 10px; color: #888; margin-bottom: 12px; }
+        img { width: 200px; height: 200px; }
+        .code { font-size: 11px; font-family: monospace; color: #1769FF; margin-top: 8px; letter-spacing: 1px; }
+      </style></head><body>
+      <div class="label">
+        <div class="logo">🏢 Lintasarta FMSP</div>
+        <div class="name">${selectedAsset.name}</div>
+        <div class="location">${selectedAsset.location}</div>
+        <img src="${qrDataUrl}" alt="QR Code" />
+        <div class="code">${code}</div>
+      </div>
+      <script>window.onload = () => { window.print(); }<\/script>
+      </body></html>
+    `);
+    win.document.close();
+  };
+
 
   // Format Mata Uang Rupiah
   const formatRupiah = (num: number) => {
@@ -1331,7 +1370,7 @@ export default function Home() {
                       </div>
 
                       {/* Action buttons */}
-                      <div className={`mt-6 pt-4 border-t flex items-center justify-between gap-3 ${c_border}`}>
+                      <div className={`mt-6 pt-4 border-t flex items-center justify-between gap-2 ${c_border}`}>
                         <button 
                           onClick={() => {
                             setSelectedAsset(asset);
@@ -1340,6 +1379,13 @@ export default function Home() {
                           className="flex-1 py-2 bg-[#1769FF] hover:bg-[#4A8AFF] text-white border border-[#1769FF] rounded-lg text-xs font-semibold transition-colors"
                         >
                           Lihat Detail
+                        </button>
+                        <button 
+                          onClick={() => handleShowQR(asset)}
+                          title="Generate QR Code"
+                          className={`py-2 px-3 border rounded-lg text-xs font-semibold transition-colors ${isDark ? 'bg-zinc-800 hover:bg-zinc-700/80 border-zinc-700/40 text-zinc-200' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-700'}`}
+                        >
+                          QR
                         </button>
                         <button 
                           onClick={() => {
@@ -2031,6 +2077,61 @@ export default function Home() {
                 Proses Perpanjangan Dokumen
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL 5: QR Code Aset */}
+      {showQrModal && selectedAsset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className={`w-full max-w-sm border rounded-2xl shadow-2xl overflow-hidden ${c_modal}`}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: isDark ? '#1A2744' : '#E0E8F5' }}>
+              <div>
+                <h3 className="text-sm font-bold">QR Code Aset</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Scan untuk lihat detail aset</p>
+              </div>
+              <button onClick={() => setShowQrModal(false)} className="text-zinc-500 hover:text-red-500 text-xs font-medium transition-colors">✕ Tutup</button>
+            </div>
+
+            {/* QR Display */}
+            <div className="flex flex-col items-center px-6 py-6 gap-4">
+              {/* Label Tag */}
+              <div className={`w-full rounded-xl border p-4 text-center ${isDark ? 'bg-white/5 border-[#1A2744]' : 'bg-[#F0F5FF] border-[#C7D9FF]'}`}>
+                <p className="text-[10px] font-semibold tracking-widest text-[#1769FF] mb-2">🏢 LINTASARTA FMSP</p>
+                <p className="text-sm font-bold leading-tight">{selectedAsset.name}</p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{selectedAsset.location}</p>
+
+                {qrDataUrl ? (
+                  <img src={qrDataUrl} alt="QR Code" className="w-48 h-48 mx-auto mt-3 rounded-lg" />
+                ) : (
+                  <div className="w-48 h-48 mx-auto mt-3 rounded-lg bg-zinc-200 animate-pulse" />
+                )}
+
+                <p className="text-[11px] font-mono text-[#1769FF] mt-2 tracking-widest">
+                  FMSP-{selectedAsset.id.slice(-8).toUpperCase()}
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={handleDownloadQR}
+                  className="flex-1 py-2.5 rounded-lg text-xs font-semibold bg-[#1769FF] hover:bg-[#4A8AFF] text-white transition-colors"
+                >
+                  ⬇ Download PNG
+                </button>
+                <button
+                  onClick={handlePrintQR}
+                  className={`flex-1 py-2.5 rounded-lg text-xs font-semibold border transition-colors ${isDark ? 'border-zinc-600 hover:bg-white/10 text-zinc-200' : 'border-zinc-300 hover:bg-zinc-100 text-zinc-700'}`}
+                >
+                  🖨️ Print Label
+                </button>
+              </div>
+
+              <p className={`text-[10px] text-center ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                Tempel label QR ini di aset fisik untuk akses cepat via smartphone
+              </p>
+            </div>
           </div>
         </div>
       )}

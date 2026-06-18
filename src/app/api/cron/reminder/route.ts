@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const docs = await prisma.legalDocument.findMany({
       where: {
         complianceStatus: { in: ['warning', 'expired'] },
-        expiryDate: { not: null },
+        expiryDate: { not: undefined },
       },
       include: { asset: { select: { name: true, location: true } } },
     });
