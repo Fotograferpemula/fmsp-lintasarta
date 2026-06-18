@@ -2229,13 +2229,13 @@ export default function Home() {
       {/* ── Bottom Navigation (Mobile Only) ─────────── */}
       <nav className={`fixed bottom-0 left-0 right-0 z-40 md:hidden border-t bottom-nav-safe ${isDark ? 'bg-[#0B1628]/95 border-[#1A2744]' : 'bg-white/95 border-[#E0E8F5]'} backdrop-blur-xl`}>
         <div className="grid grid-cols-5 h-16">
-          {[
-            { tab: 'overview',      icon: '📊', label: 'Overview' },
-            { tab: 'assets',        icon: '🏢', label: 'Aset' },
-            { tab: 'workorder',     icon: '🔧', label: 'WO' },
-            { tab: 'maintenance',   icon: '📅', label: 'PM' },
-            { tab: 'notifications', icon: '🔔', label: 'Alerts' },
-          ].map(({ tab, icon, label }) => (
+          {([
+            { tab: 'overview'      as const, icon: '📊', label: 'Overview' },
+            { tab: 'assets'        as const, icon: '🏢', label: 'Aset' },
+            { tab: 'workorder'     as const, icon: '🔧', label: 'WO' },
+            { tab: 'maintenance'   as const, icon: '📅', label: 'PM' },
+            { tab: 'notifications' as const, icon: '🔔', label: 'Alerts' },
+          ]).map(({ tab, icon, label }) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
