@@ -140,6 +140,11 @@ export default function Home() {
   const [docSearch, setDocSearch] = useState('');
   const [docFilterType, setDocFilterType] = useState('all');
 
+  // Mobile UI State
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pwaPrompt, setPwaPrompt] = useState<any>(null);
+  const [showPwaBanner, setShowPwaBanner] = useState(false);
+
   // Modal State
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -228,6 +233,22 @@ export default function Home() {
       fetchData();
     }
   }, [isAuthenticated]);
+
+  // PWA Install Prompt
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setPwaPrompt(e);
+      setShowPwaBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  // Close mobile sidebar when tab changes
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [activeTab]);
 
   // Simulasi MFA Microsoft Authenticator
   useEffect(() => {
@@ -695,8 +716,23 @@ export default function Home() {
         </>
       )}
 
-      {/* Sidebar */}
-      <aside className={`w-64 border-r backdrop-blur-xl flex flex-col justify-between shrink-0 transition-colors duration-300 ${c_sidebar}`}>
+      {/* ── Mobile Drawer Overlay ────────────────── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — hidden on mobile, drawer on small screens */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 flex flex-col justify-between
+        transition-transform duration-300 ease-in-out
+        md:static md:w-64 md:z-auto md:translate-x-0 md:flex md:shrink-0
+        border-r backdrop-blur-xl
+        ${sidebarOpen ? 'translate-x-0 animate-slide-left' : '-translate-x-full'}
+        ${c_sidebar}
+      `}>
         <div className="flex-1 overflow-y-auto">
           {/* Header Sidebar — Lintasarta Logo */}
           <div className={`h-20 border-b flex items-center px-5 gap-3 ${c_border}`}>
@@ -850,11 +886,22 @@ export default function Home() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto mobile-content-pad">
         
         {/* Header Bar */}
-        <header className={`h-20 border-b px-8 flex items-center justify-between backdrop-blur-md sticky top-0 z-30 transition-colors duration-300 ${c_header}`}>
-          <h1 className={`text-xl font-bold tracking-tight capitalize ${c_text_title}`}>
+        <header className={`h-16 md:h-20 border-b px-4 md:px-8 flex items-center justify-between backdrop-blur-md sticky top-0 z-30 transition-colors duration-300 ${c_header}`}>
+          {/* Mobile: Hamburger + Title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className={`md:hidden p-2 rounded-xl border transition-all ${isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'}`}
+              aria-label="Buka menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          <h1 className={`text-base md:text-xl font-bold tracking-tight capitalize ${c_text_title}`}>
             {activeTab === 'overview' && 'Dashboard — Ringkasan Portofolio Aset'}
             {activeTab === 'assets' && 'Manajemen Aset & Perizinan'}
             {activeTab === 'notifications' && 'Kotak Alerts & Reminder'}
@@ -868,8 +915,9 @@ export default function Home() {
             {activeTab === 'auditlog' && 'Audit Log — Catatan Aktivitas'}
             {activeTab === 'admin' && 'Admin — Master Data Management'}
           </h1>
+          </div>{/* end hamburger+title */}
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             
             {/* BUTTON TOGGLE TEMA (TERANG / GELAP) */}
             <button 
@@ -884,16 +932,16 @@ export default function Home() {
               <button 
                 onClick={runReminderCron}
                 disabled={cronLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1769FF] to-[#0D4FCC] hover:from-[#4A8AFF] hover:to-[#1769FF] disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#1769FF] to-[#0D4FCC] hover:from-[#4A8AFF] hover:to-[#1769FF] disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${cronLoading ? 'animate-spin' : ''}`} />
-                {cronLoading ? 'Sedang Evaluasi...' : 'Jalankan Simulasi Cron'}
+                {cronLoading ? 'Evaluasi...' : 'Simulasi Cron'}
               </button>
             )}
 
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-semibold">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-semibold">
               <ShieldCheck className="w-3.5 h-3.5" />
-              Infosec Protected
+              <span className="hidden md:inline">Infosec Protected</span>
             </div>
           </div>
         </header>
@@ -2135,6 +2183,56 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* ── PWA Install Banner ──────────────────────── */}
+      {showPwaBanner && (
+        <div className="pwa-install-banner animate-slide-up">
+          <span>📱</span>
+          <span>Install FMSP di HP kamu</span>
+          <button
+            onClick={async () => {
+              if (pwaPrompt) {
+                pwaPrompt.prompt();
+                const { outcome } = await pwaPrompt.userChoice;
+                if (outcome === 'accepted') setShowPwaBanner(false);
+              }
+            }}
+            className="bg-white text-[#1769FF] px-3 py-1 rounded-full text-xs font-bold"
+          >
+            Install
+          </button>
+          <button onClick={() => setShowPwaBanner(false)} className="text-white/70 hover:text-white text-sm leading-none">✕</button>
+        </div>
+      )}
+
+      {/* ── Bottom Navigation (Mobile Only) ─────────── */}
+      <nav className={`fixed bottom-0 left-0 right-0 z-40 md:hidden border-t bottom-nav-safe ${isDark ? 'bg-[#0B1628]/95 border-[#1A2744]' : 'bg-white/95 border-[#E0E8F5]'} backdrop-blur-xl`}>
+        <div className="grid grid-cols-5 h-16">
+          {[
+            { tab: 'overview',      icon: '📊', label: 'Overview' },
+            { tab: 'assets',        icon: '🏢', label: 'Aset' },
+            { tab: 'workorder',     icon: '🔧', label: 'WO' },
+            { tab: 'maintenance',   icon: '📅', label: 'PM' },
+            { tab: 'notifications', icon: '🔔', label: 'Alerts' },
+          ].map(({ tab, icon, label }) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-all ${
+                activeTab === tab
+                  ? 'text-[#1769FF]'
+                  : isDark ? 'text-zinc-500' : 'text-zinc-400'
+              }`}
+            >
+              <span className="text-lg leading-none">{icon}</span>
+              <span>{label}</span>
+              {activeTab === tab && (
+                <span className="absolute bottom-0 w-8 h-0.5 bg-[#1769FF] rounded-full" />
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
 
     </div>
   );

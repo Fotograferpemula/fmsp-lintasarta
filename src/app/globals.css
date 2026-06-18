@@ -12,6 +12,9 @@
   --la-accent: #E29E9D;
   --la-sidebar-dark: #0B1628;
   --la-sidebar-dark-hover: #112040;
+  /* Safe area for notched phones */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 @theme inline {
@@ -34,19 +37,106 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Prevent overscroll bounce on iOS */
+  overscroll-behavior: none;
 }
 
-/* Lintasarta Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ── Lintasarta Custom Scrollbar ──────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: rgba(23, 105, 255, 0.25);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(23, 105, 255, 0.45);
+}
+
+/* ── Animations ───────────────────────────────────── */
+@keyframes animate-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slide-in-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.animate-fade-in { animation: animate-fade-in 0.2s ease-out; }
+.animate-slide-left { animation: slide-in-left 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-slide-up { animation: slide-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ── Mobile Touch Optimizations ──────────────────── */
+@media (max-width: 767px) {
+  /* Larger tap targets on mobile */
+  button, [role="button"] {
+    min-height: 40px;
+  }
+  /* Prevent text selection on interactive elements */
+  button { -webkit-tap-highlight-color: transparent; user-select: none; }
+  /* Bottom padding for content above bottom nav */
+  .mobile-content-pad { padding-bottom: calc(72px + var(--safe-bottom)); }
+  /* Full-width modals on mobile */
+  .modal-mobile {
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+  /* Stack table rows as cards on mobile */
+  .table-mobile thead { display: none; }
+  .table-mobile tbody tr {
+    display: block;
+    border: 1px solid rgba(23,105,255,0.1);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    padding: 12px;
+  }
+  .table-mobile tbody td {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 12px;
+    border: none;
+  }
+  .table-mobile tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6b7280;
+    margin-right: 8px;
+    white-space: nowrap;
+  }
+}
+
+/* ── PWA Install Banner ───────────────────────────── */
+.pwa-install-banner {
+  position: fixed;
+  bottom: calc(80px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: #1769FF;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 24px rgba(23,105,255,0.4);
+  white-space: nowrap;
+}
+
+/* ── Bottom Nav Safe Area ─────────────────────────── */
+.bottom-nav-safe {
+  padding-bottom: var(--safe-bottom);
 }
