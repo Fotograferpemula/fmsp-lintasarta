@@ -55,6 +55,7 @@ import WorkOrderView from '@/components/management/WorkOrderView';
 import AuditLogView from '@/components/management/AuditLogView';
 import AdminView from '@/components/management/AdminView';
 import UserManagementView from '@/components/management/UserManagementView';
+import AnalyticsView from '@/components/management/AnalyticsView';
 
 // Tipe data berdasarkan model Prisma
 interface Asset {
@@ -124,7 +125,7 @@ export default function Home() {
   const isDark = theme === 'dark';
 
   // State Utama Aplikasi
-  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin' | 'users' | 'analytics'>('overview');
   // Sub-tab states for consolidated menus
   const [assetSubTab, setAssetSubTab] = useState<'aset' | 'legal'>('aset');
   const [hrdSubTab, setHrdSubTab] = useState<'karyawan' | 'security'>('karyawan');
@@ -856,6 +857,18 @@ export default function Home() {
               Work Order / Ticket
             </button>
 
+            {/* Header Analytics */}
+            <div className="pt-4 pb-2 px-4">
+              <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Analytics</span>
+            </div>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'analytics' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              Analytics & Charts
+            </button>
+
             {/* Header Integration */}
             <div className="pt-4 pb-2 px-4">
               <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Integration</span>
@@ -948,6 +961,7 @@ export default function Home() {
             {activeTab === 'auditlog' && 'Audit Log — Catatan Aktivitas'}
             {activeTab === 'admin' && 'Admin — Master Data Management'}
             {activeTab === 'users' && 'Manajemen Pengguna'}
+            {activeTab === 'analytics' && 'Analytics & Insights — Visualisasi Data'}
           </h1>
           </div>{/* end hamburger+title */}
 
@@ -1760,6 +1774,9 @@ export default function Home() {
                 isDark={isDark}
                 currentUserEmail={currentUser?.email || ''}
               />
+            )}
+            {activeTab === 'analytics' && (
+              <AnalyticsView token={authToken} isDark={isDark} />
             )}
 
           </div>
