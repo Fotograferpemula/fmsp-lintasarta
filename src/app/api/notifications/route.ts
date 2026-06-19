@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { withAuth, JWTPayload, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { withRBAC } from '@/lib/rbac-middleware';
-import { sendEmail } from '@/lib/email-service';
+import { sendPendingNotifications } from '@/lib/cron-scheduler';
+import { getAppSetting } from '@/lib/app-settings';
 
 const RESOURCE = 'notifications';
 
@@ -26,6 +27,8 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
 
     let createdCount = 0;
     const notificationsCreated: any[] = [];
+    const defaultEmail = await getAppSetting('notification_default_email', 'admin@lintasarta.co.id');
+    const warningDays = parseInt(await getAppSetting('doc_warning_days', '30')) || 30;
 
     for (const doc of docs) {
       const expiry = new Date(doc.expiryDate);
@@ -42,7 +45,7 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
         shouldAlert = true;
         title = `⚠️ PERINGATAN CRITICAL: Dokumen Legal ${doc.title} TELAH EXPIRED`;
         message = `Dokumen legalitas "${doc.title}" untuk aset "${doc.asset.name}" telah habis masa berlakunya pada tanggal ${expiry.toLocaleDateString('id-ID')}. Mohon segera lakukan proses perpanjangan dokumen.`;
-      } else if (diffDays <= 30) {
+      } else if (diffDays <= warningDays) {
         shouldAlert = true;
         title = `⚠️ PENGINGAT WARNING: Dokumen Legal ${doc.title} Mendekati Jatuh Tempo`;
         message = `Dokumen legalitas "${doc.title}" untuk aset "${doc.asset.name}" akan kedaluwarsa pada tanggal ${expiry.toLocaleDateString('id-ID')} (${diffDays} hari lagi). Harap siapkan dokumen perpanjangan.`;
@@ -51,7 +54,7 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
       if (shouldAlert) {
         const existingNotification = await prisma.notification.findFirst({
           where: {
-            recipientEmail: 'admin@lintasarta.co.id',
+            recipientEmail: defaultEmail,
             title: title,
             scheduledAt: { gte: new Date(now.getTime() - 30 * 86400000) },
           },
@@ -60,7 +63,7 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
         if (!existingNotification) {
           const newNotif = await prisma.notification.create({
             data: {
-              recipientEmail: 'admin@lintasarta.co.id',
+              recipientEmail: defaultEmail,
               type: 'email',
               title, message,
               status: 'pending',
@@ -74,28 +77,7 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
     }
 
     // Kirim semua notifikasi pending via email service
-    const pendingNotifs = await prisma.notification.findMany({
-      where: { status: 'pending' },
-    });
-
-    const sentNotifications = [];
-    for (const notif of pendingNotifs) {
-      const emailResult = await sendEmail({
-        to: notif.recipientEmail,
-        subject: notif.title,
-        message: notif.message,
-        documentLink: '/?tab=legal',
-      });
-
-      const updatedNotif = await prisma.notification.update({
-        where: { id: notif.id },
-        data: {
-          status: emailResult.success ? 'sent' : 'failed',
-          sentAt: emailResult.success ? new Date() : null,
-        },
-      });
-      sentNotifications.push({ ...updatedNotif, previewUrl: emailResult.previewUrl });
-    }
+    const sentNotifications = await sendPendingNotifications();
 
     await prisma.auditLog.create({
       data: {

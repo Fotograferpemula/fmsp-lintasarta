@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Manual Pemeliharaan Sistem FMSP Lintasarta</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm;
+        }
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+        }
+        h1, h2, h3 {
+            color: #7C3AED;
+            font-weight: bold;
+            page-break-after: avoid;
+        }
+        h1 {
+            font-size: 20pt;
+            border-bottom: 2px solid #7C3AED;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+        h2 {
+            font-size: 14pt;
+            color: #5B21B6;
+            margin-top: 25px;
+        }
+        h3 {
+            font-size: 12pt;
+            color: #475569;
+            margin-top: 20px;
+            font-style: italic;
+        }
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            text-align: center;
+            padding: 2cm 0;
+            box-sizing: border-box;
+            page-break-after: always;
+        }
+        .cover-header {
+            margin-top: 10%;
+        }
+        .cover-logo {
+            max-width: 250px;
+            margin: 0 auto 50px auto;
+            display: block;
+        }
+        .cover-title {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #7C3AED;
+            margin: 0;
+            line-height: 1.2;
+        }
+        .cover-subtitle {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #64748B;
+            margin-top: 15px;
+            text-transform: uppercase;
+        }
+        .cover-divider {
+            width: 150px;
+            height: 4px;
+            background-color: #7C3AED;
+            margin: 30px auto;
+        }
+        .cover-meta {
+            font-size: 11pt;
+            color: #94A3B8;
+            margin-top: 50px;
+        }
+        .cover-footer {
+            margin-bottom: 5%;
+            font-size: 12pt;
+            font-weight: bold;
+            color: #7C3AED;
+            line-height: 1.5;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 9.5pt;
+        }
+        th, td {
+            border: 1px solid #CBD5E1;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #7C3AED;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #F8FAFC;
+        }
+        pre, code {
+            background-color: #F1F5F9;
+            font-family: 'Courier New', monospace;
+            font-size: 9.5pt;
+        }
+        code {
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        pre {
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .img-container {
+            text-align: center;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        .img-container img {
+            max-width: 95%;
+            height: auto;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .img-caption {
+            font-size: 8.5pt;
+            font-style: italic;
+            color: #64748B;
+            margin-top: 8px;
+        }
+        .warn-box {
+            background-color: #FEF3C7;
+            border-left: 4px solid #D97706;
+            padding: 12px 16px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 10pt;
+        }
+        .danger-box {
+            background-color: #FEE2E2;
+            border-left: 4px solid #DC2626;
+            padding: 12px 16px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 10pt;
+        }
+        .info-box {
+            background-color: #EDE9FE;
+            border-left: 4px solid #7C3AED;
+            padding: 12px 16px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 10pt;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- COVER PAGE -->
+    <div class="cover">
+        <div class="cover-header">
+            <img class="cover-logo" src="screenshots/logo.png" alt="Lintasarta Logo">
+            <h1 class="cover-title" style="border:none; margin:0; padding:0;">MANUAL PEMELIHARAAN SISTEM<br>(MAINTENANCE MANUAL)</h1>
+            <div class="cover-subtitle">Facility Management Service Platform (FMSP) Lintasarta</div>
+            <div class="cover-divider"></div>
+            <div class="cover-meta">
+                Dokumentasi Teknis, Konfigurasi, Deployment, Backup & Restore<br>
+                Versi 2.1 — Juni 2026
+            </div>
+        </div>
+        <div class="cover-footer">
+            PT Aplikanusa Lintasarta<br>
+            Divisi IT Infrastructure & DevOps
+        </div>
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div class="page-break">
+        <h1>Daftar Isi</h1>
+        <ul style="list-style-type: none; padding-left: 0; line-height: 2;">
+            <li><strong>1. Pendahuluan & Lingkup Sistem</strong></li>
+            <li><strong>2. Arsitektur & Tech Stack</strong></li>
+            <li style="padding-left: 20px;">2.1 Komponen Utama</li>
+            <li style="padding-left: 20px;">2.2 Struktur File Krusial</li>
+            <li style="padding-left: 20px;">2.3 Middleware & Library Keamanan</li>
+            <li><strong>3. Konfigurasi Sistem</strong></li>
+            <li style="padding-left: 20px;">3.1 Variabel Lingkungan (.env)</li>
+            <li style="padding-left: 20px;">3.2 Docker Compose (Development)</li>
+            <li style="padding-left: 20px;">3.3 Integrasi Google SSO</li>
+            <li style="padding-left: 20px;">3.4 Konfigurasi AI Copilot (Ollama)</li>
+            <li><strong>4. Deployment & Infrastruktur</strong></li>
+            <li style="padding-left: 20px;">4.1 Fly.io Configuration</li>
+            <li style="padding-left: 20px;">4.2 Dockerfile</li>
+            <li style="padding-left: 20px;">4.3 Health Check & Auto-scaling</li>
+            <li style="padding-left: 20px;">4.4 Fly.io Secrets Management</li>
+            <li><strong>5. Manajemen Database</strong></li>
+            <li style="padding-left: 20px;">5.1 Skema Database (22 Tabel)</li>
+            <li style="padding-left: 20px;">5.2 Prisma Migrate & Client Generation</li>
+            <li style="padding-left: 20px;">5.3 Seeding Data Awal</li>
+            <li><strong>6. Prosedur Backup & Restore</strong></li>
+            <li style="padding-left: 20px;">6.1 Manual Backup (pg_dump)</li>
+            <li style="padding-left: 20px;">6.2 Manual Restore (pg_restore)</li>
+            <li style="padding-left: 20px;">6.3 Backup Otomatis (Cron)</li>
+            <li><strong>7. Keamanan Sistem</strong></li>
+            <li style="padding-left: 20px;">7.1 Autentikasi & JWT</li>
+            <li style="padding-left: 20px;">7.2 RBAC & Permission Matrix</li>
+            <li style="padding-left: 20px;">7.3 Rate Limiting</li>
+            <li style="padding-left: 20px;">7.4 XSS & Input Validation (Zod)</li>
+            <li style="padding-left: 20px;">7.5 CORS & HTTP Headers</li>
+            <li><strong>8. API Endpoints Reference</strong></li>
+            <li><strong>9. Relasi Tabel Database (ERD)</strong></li>
+            <li><strong>10. Troubleshooting</strong></li>
+        </ul>
+    </div>
+
+    <!-- CHAPTER 1 -->
+    <div class="page-break">
+        <h1>1. Pendahuluan & Lingkup Sistem</h1>
+        <p>Manual Pemeliharaan ini ditujukan untuk <strong>administrator sistem, tim IT Infrastructure, dan DevOps</strong> PT Aplikanusa Lintasarta. Dokumen ini berisi instruksi teknis lengkap untuk mengelola, mengonfigurasi, melakukan pencadangan data, migrasi skema database, dan memelihara infrastruktur aplikasi FMSP Lintasarta agar berjalan optimal.</p>
+        <div class="danger-box">
+            <strong>🔒 RAHASIA:</strong> Dokumen ini mengandung informasi sensitif tentang arsitektur keamanan, kredensial default, dan konfigurasi infrastruktur. Dilarang menyebarluaskan tanpa persetujuan Divisi Keamanan Informasi.
+        </div>
+    </div>
+
+    <!-- CHAPTER 2 -->
+    <div class="page-break">
+        <h1>2. Arsitektur & Tech Stack</h1>
+
+        <h2>2.1 Komponen Utama</h2>
+        <table>
+            <thead><tr><th>Layer</th><th>Teknologi</th><th>Versi</th></tr></thead>
+            <tbody>
+                <tr><td>Frontend Framework</td><td>Next.js (App Router)</td><td>16.2.9</td></tr>
+                <tr><td>UI Library</td><td>React</td><td>19.2.4</td></tr>
+                <tr><td>Language</td><td>TypeScript</td><td>5.x</td></tr>
+                <tr><td>CSS Framework</td><td>Tailwind CSS</td><td>4.x</td></tr>
+                <tr><td>ORM</td><td>Prisma Client</td><td>6.19.3</td></tr>
+                <tr><td>Database</td><td>PostgreSQL</td><td>16+</td></tr>
+                <tr><td>Auth — JWT</td><td>jsonwebtoken</td><td>9.0.3</td></tr>
+                <tr><td>Auth — SSO</td><td>Google OAuth API</td><td>—</td></tr>
+                <tr><td>Auth — Hashing</td><td>bcryptjs</td><td>3.0.3</td></tr>
+                <tr><td>Email</td><td>Nodemailer</td><td>9.0.0</td></tr>
+                <tr><td>Cron Scheduler</td><td>node-cron</td><td>4.2.1</td></tr>
+                <tr><td>Charts</td><td>Recharts</td><td>3.8.1</td></tr>
+                <tr><td>Push Notification</td><td>web-push (VAPID)</td><td>3.6.7</td></tr>
+                <tr><td>QR Code</td><td>qrcode</td><td>1.5.4</td></tr>
+                <tr><td>Validation</td><td>Zod</td><td>4.4.3</td></tr>
+                <tr><td>PDF Generation</td><td>@react-pdf/renderer</td><td>4.5.1</td></tr>
+                <tr><td>AI Copilot</td><td>Ollama (Qwen 2.5)</td><td>—</td></tr>
+                <tr><td>Realtime</td><td>Socket.IO</td><td>4.8.3</td></tr>
+                <tr><td>Icons</td><td>Lucide React</td><td>1.20.0</td></tr>
+                <tr><td>Date Utility</td><td>date-fns</td><td>4.4.0</td></tr>
+                <tr><td>Deployment</td><td>Fly.io + Docker</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <h2>2.2 Struktur File Krusial</h2>
+        <table>
+            <thead><tr><th>File / Direktori</th><th>Fungsi</th></tr></thead>
+            <tbody>
+                <tr><td><code>prisma/schema.prisma</code></td><td>Definisi 22 tabel database PostgreSQL + relasi</td></tr>
+                <tr><td><code>prisma/seed.ts</code></td><td>Script seeding data awal (SuperAdmin, Master Data, AppSettings)</td></tr>
+                <tr><td><code>src/lib/db.ts</code></td><td>Singleton Prisma Client (mencegah connection pool exhaustion)</td></tr>
+                <tr><td><code>src/lib/auth-middleware.ts</code></td><td>JWT verification + brute force protection (lockout 15 min / 5 attempts)</td></tr>
+                <tr><td><code>src/lib/rbac.ts</code></td><td>Role definitions & permission matrix (6 roles)</td></tr>
+                <tr><td><code>src/lib/rbac-middleware.ts</code></td><td>Middleware enforcer per-endpoint RBAC check</td></tr>
+                <tr><td><code>src/lib/validators.ts</code></td><td>Zod schemas untuk semua input API (XSS protection)</td></tr>
+                <tr><td><code>src/lib/file-validator.ts</code></td><td>File upload validation (type whitelist, size limit 10MB, magic bytes check)</td></tr>
+                <tr><td><code>src/lib/email-service.ts</code></td><td>Nodemailer SMTP wrapper + Ethereal mock mode</td></tr>
+                <tr><td><code>src/lib/push-service.ts</code></td><td>Web Push VAPID notification sender</td></tr>
+                <tr><td><code>src/lib/cron-auth.ts</code></td><td>CRON_SECRET header verification untuk endpoint /api/cron/*</td></tr>
+                <tr><td><code>src/lib/region-filter.ts</code></td><td>Prisma WHERE clause generator untuk filter region per role</td></tr>
+                <tr><td><code>src/lib/api-error.ts</code></td><td>Centralized error handler (sanitized error responses)</td></tr>
+                <tr><td><code>src/app/api/</code></td><td>11 route groups: auth, assets, legal-documents, management (11 sub-routes), analytics, audit-logs, chat, cron, notifications, reports, upload</td></tr>
+                <tr><td><code>fly.toml</code></td><td>Fly.io deployment config (region: sin, port: 8080)</td></tr>
+                <tr><td><code>Dockerfile</code></td><td>Multi-stage Docker build (node:22-alpine)</td></tr>
+                <tr><td><code>docker-compose.yml</code></td><td>Local dev setup: PostgreSQL container + app</td></tr>
+            </tbody>
+        </table>
+
+        <h2>2.3 Middleware & Library Keamanan</h2>
+        <p>Setiap API endpoint dilindungi oleh chain middleware berikut:</p>
+        <ol>
+            <li><strong>Rate Limiter:</strong> Membatasi jumlah request per IP per window (login: 5 req/min, API: 60 req/min)</li>
+            <li><strong>JWT Verifier (auth-middleware):</strong> Memvalidasi token dari header Authorization, cek expired, cek user aktif</li>
+            <li><strong>RBAC Enforcer (rbac-middleware):</strong> Memeriksa apakah role user memiliki permission untuk resource + action</li>
+            <li><strong>Input Validator (validators/Zod):</strong> Memvalidasi dan sanitize body request — strip HTML tags, escape special chars</li>
+            <li><strong>Audit Logger:</strong> Mencatat operasi ke tabel AuditLog</li>
+        </ol>
+    </div>
+
+    <!-- CHAPTER 3 -->
+    <div class="page-break">
+        <h1>3. Konfigurasi Sistem</h1>
+
+        <h2>3.1 Variabel Lingkungan (.env)</h2>
+        <p>Salin file <code>.env.example</code> menjadi <code>.env</code> dan ubah semua nilai default:</p>
+        <table>
+            <thead><tr><th>Variabel</th><th>Deskripsi</th><th>Contoh / Default</th></tr></thead>
+            <tbody>
+                <tr><td><code>DATABASE_URL</code></td><td>URL koneksi PostgreSQL</td><td>postgresql://user:pass@host:5432/db</td></tr>
+                <tr><td><code>POSTGRES_USER</code></td><td>Username PostgreSQL (Docker)</td><td>fmsp_user</td></tr>
+                <tr><td><code>POSTGRES_PASSWORD</code></td><td>Password PostgreSQL (Docker)</td><td><em>Harus diganti!</em></td></tr>
+                <tr><td><code>POSTGRES_DB</code></td><td>Nama database</td><td>fmsp_db</td></tr>
+                <tr><td><code>JWT_SECRET</code></td><td>Secret key penandatangan JWT</td><td><em>Generate: openssl rand -hex 64</em></td></tr>
+                <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>OAuth Client ID dari Google Cloud Console</td><td>xxx.apps.googleusercontent.com</td></tr>
+                <tr><td><code>PORT</code></td><td>Port aplikasi</td><td>3847 (dev) / 8080 (prod)</td></tr>
+                <tr><td><code>APP_BASE_URL</code></td><td>URL root aplikasi</td><td>https://fmsp-lintasarta.fly.dev</td></tr>
+                <tr><td><code>SMTP_HOST</code></td><td>Server SMTP</td><td>smtp.office365.com</td></tr>
+                <tr><td><code>SMTP_PORT</code></td><td>Port SMTP</td><td>587</td></tr>
+                <tr><td><code>SMTP_USER</code></td><td>Email pengirim</td><td>noreply@lintasarta.co.id</td></tr>
+                <tr><td><code>SMTP_PASSWORD</code></td><td>Password SMTP</td><td><em>Harus diset!</em></td></tr>
+                <tr><td><code>CRON_SECRET</code></td><td>Secret untuk autentikasi endpoint cron</td><td><em>Generate: openssl rand -hex 32</em></td></tr>
+                <tr><td><code>NEXT_PUBLIC_VAPID_PUBLIC_KEY</code></td><td>VAPID public key untuk Web Push</td><td><em>Generate: npx web-push generate-vapid-keys</em></td></tr>
+                <tr><td><code>VAPID_PRIVATE_KEY</code></td><td>VAPID private key</td><td><em>Pair dengan public key</em></td></tr>
+                <tr><td><code>VAPID_CONTACT</code></td><td>Email kontak VAPID</td><td>mailto:admin@lintasarta.co.id</td></tr>
+                <tr><td><code>OLLAMA_BASE_URL</code></td><td>URL server Ollama lokal</td><td>http://127.0.0.1:11434</td></tr>
+                <tr><td><code>OLLAMA_MODEL</code></td><td>Model AI yang digunakan</td><td>qwen2.5:1.5b</td></tr>
+            </tbody>
+        </table>
+        <div class="danger-box">
+            <strong>🔴 KRITIS:</strong> Variabel <code>JWT_SECRET</code>, <code>CRON_SECRET</code>, dan <code>POSTGRES_PASSWORD</code> HARUS diganti dari nilai default. Aplikasi menolak start jika JWT_SECRET masih bernilai default.
+        </div>
+
+        <h2>3.2 Docker Compose (Development)</h2>
+        <p>Untuk menjalankan development environment lokal:</p>
+        <pre>docker compose up -d        # Start PostgreSQL container
+npm install                 # Install dependencies
+npx prisma db push          # Sync schema ke database
+npx prisma db seed          # Seed data awal (SuperAdmin, AppSettings)
+npm run dev                 # Start Next.js dev server (port 4100)</pre>
+
+        <h2>3.3 Integrasi Google SSO</h2>
+        <p>Konfigurasi Google OAuth Client ID:</p>
+        <ol>
+            <li>Buka <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console → APIs & Services → Credentials</a></li>
+            <li>Buat OAuth 2.0 Client ID (Application type: Web application)</li>
+            <li>Set Authorized JavaScript Origins: <code>http://localhost:4100</code> dan <code>https://fmsp-lintasarta.fly.dev</code></li>
+            <li>Set Authorized Redirect URIs: <code>http://localhost:4100</code> dan <code>https://fmsp-lintasarta.fly.dev</code></li>
+            <li>Salin Client ID ke <code>GOOGLE_CLIENT_ID</code> di .env</li>
+        </ol>
+        <div class="info-box">
+            <strong>ℹ️ Catatan:</strong> Google SSO memanfaatkan Google 2-Step Verification yang sudah aktif di akun Google Workspace pengguna, sehingga MFA otomatis terpenuhi.
+        </div>
+
+        <h2>3.4 Konfigurasi AI Copilot (Ollama)</h2>
+        <ul>
+            <li><code>OLLAMA_BASE_URL</code>: Alamat server Ollama (default: http://127.0.0.1:11434)</li>
+            <li><code>OLLAMA_MODEL</code>: Model yang digunakan (default: qwen2.5:1.5b)</li>
+            <li>Status on/off dapat dikendalikan secara dinamis melalui AppSetting key <code>ai_bot_enabled</code></li>
+            <li>Fallback otomatis ke keyword search jika Ollama tidak merespons dalam 1.2 detik</li>
+        </ul>
+    </div>
+
+    <!-- CHAPTER 4 -->
+    <div class="page-break">
+        <h1>4. Deployment & Infrastruktur</h1>
+
+        <h2>4.1 Fly.io Configuration (fly.toml)</h2>
+        <table>
+            <thead><tr><th>Parameter</th><th>Nilai</th><th>Keterangan</th></tr></thead>
+            <tbody>
+                <tr><td>app</td><td>fmsp-lintasarta</td><td>Nama aplikasi di Fly.io</td></tr>
+                <tr><td>primary_region</td><td>sin</td><td>Singapore — terdekat dengan Indonesia</td></tr>
+                <tr><td>internal_port</td><td>8080</td><td>Port internal container</td></tr>
+                <tr><td>force_https</td><td>true</td><td>Redirect HTTP → HTTPS</td></tr>
+                <tr><td>auto_stop_machines</td><td>stop</td><td>Hibernasi mesin saat idle</td></tr>
+                <tr><td>auto_start_machines</td><td>true</td><td>Bangun otomatis saat ada request</td></tr>
+                <tr><td>release_command</td><td>npx prisma@6.19.3 db push --accept-data-loss</td><td>Auto-migrate schema saat deploy</td></tr>
+                <tr><td>memory</td><td>1GB</td><td>RAM per VM instance</td></tr>
+                <tr><td>cpu_kind</td><td>shared</td><td>Shared CPU (cost-efficient)</td></tr>
+                <tr><td>health check path</td><td>/</td><td>GET / setiap 15 detik</td></tr>
+            </tbody>
+        </table>
+
+        <h2>4.2 Deployment Commands</h2>
+        <pre># Deploy ke production
+fly deploy
+
+# Lihat status aplikasi
+fly status
+
+# Lihat logs real-time
+fly logs
+
+# SSH ke container
+fly ssh console
+
+# Set secrets (env vars di produksi)
+fly secrets set JWT_SECRET="xxx" DATABASE_URL="xxx" CRON_SECRET="xxx"
+
+# Lihat secrets yang sudah di-set
+fly secrets list</pre>
+
+        <h2>4.3 Health Check & Auto-scaling</h2>
+        <p>Fly.io melakukan health check HTTP GET ke path <code>/</code> setiap 15 detik dengan timeout 10 detik dan grace period 20 detik saat startup. Jika health check gagal, instance di-restart otomatis. Concurrency limit: soft=80, hard=100 koneksi per instance.</p>
+
+        <h2>4.4 Fly.io Secrets Management</h2>
+        <p>Semua variabel sensitif di-set sebagai Fly Secrets (bukan di fly.toml). Secrets yang wajib di-set:</p>
+        <pre>fly secrets set \
+  DATABASE_URL="postgresql://..." \
+  JWT_SECRET="$(openssl rand -hex 64)" \
+  CRON_SECRET="$(openssl rand -hex 32)" \
+  GOOGLE_CLIENT_ID="xxx.apps.googleusercontent.com" \
+  SMTP_HOST="smtp.office365.com" \
+  SMTP_PORT="587" \
+  SMTP_USER="noreply@lintasarta.co.id" \
+  SMTP_PASSWORD="xxx" \
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY="xxx" \
+  VAPID_PRIVATE_KEY="xxx" \
+  VAPID_CONTACT="mailto:admin@lintasarta.co.id" \
+  OLLAMA_BASE_URL="http://127.0.0.1:11434" \
+  OLLAMA_MODEL="qwen2.5:1.5b"</pre>
+    </div>
+
+    <!-- CHAPTER 5 -->
+    <div class="page-break">
+        <h1>5. Manajemen Database</h1>
+
+        <h2>5.1 Skema Database (22 Tabel)</h2>
+        <p>Database PostgreSQL FMSP Lintasarta terdiri dari 22 model/tabel yang dikelola oleh Prisma ORM:</p>
+        <table>
+            <thead><tr><th>No</th><th>Model</th><th>Tabel PostgreSQL</th><th>Fungsi</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td>User</td><td>users</td><td>Data pengguna, role, password hash, lockout</td></tr>
+                <tr><td>2</td><td>PasswordResetRequest</td><td>password_reset_requests</td><td>Permintaan reset password (approval flow)</td></tr>
+                <tr><td>3</td><td>PushSubscription</td><td>push_subscriptions</td><td>Web Push subscription endpoints per user</td></tr>
+                <tr><td>4</td><td>Asset</td><td>assets</td><td>Aset fisik: gedung, tanah, kendaraan, fasilitas</td></tr>
+                <tr><td>5</td><td>AssetTransfer</td><td>asset_transfers</td><td>Riwayat mutasi lokasi aset</td></tr>
+                <tr><td>6</td><td>LegalDocument</td><td>legal_documents</td><td>Dokumen perizinan aset (9 tipe)</td></tr>
+                <tr><td>7</td><td>Notification</td><td>notifications</td><td>Email/dashboard notifications</td></tr>
+                <tr><td>8</td><td>MaintenanceSchedule</td><td>maintenance_schedules</td><td>Jadwal PM berkala per aset</td></tr>
+                <tr><td>9</td><td>VendorContract</td><td>vendor_contracts</td><td>Kontrak kerja sama vendor</td></tr>
+                <tr><td>10</td><td>Employee</td><td>employees</td><td>Data karyawan FM + Security (Gada/KTA)</td></tr>
+                <tr><td>11</td><td>InventoryItem</td><td>inventory_items</td><td>Stok gudang sparepart + safety stock</td></tr>
+                <tr><td>12</td><td>Smk3Item</td><td>smk3_items</td><td>Checklist item K3 + status inspeksi</td></tr>
+                <tr><td>13</td><td>AccountingTransaction</td><td>accounting_transactions</td><td>Jurnal transaksi keuangan</td></tr>
+                <tr><td>14</td><td>RabBudget</td><td>rab_budgets</td><td>Pagu anggaran tahunan per departemen</td></tr>
+                <tr><td>15</td><td>WorkOrder</td><td>work_orders</td><td>Tiket kerusakan + approval workflow</td></tr>
+                <tr><td>16</td><td>HardwareDevice</td><td>hardware_devices</td><td>Perangkat IoT (BACnet/Modbus/MQTT)</td></tr>
+                <tr><td>17</td><td>DeviceState</td><td>device_states</td><td>State realtime perangkat IoT</td></tr>
+                <tr><td>18</td><td>TimeSeries</td><td>time_series</td><td>Data historis sensor (suhu, daya, PUE)</td></tr>
+                <tr><td>19</td><td>Alert</td><td>alerts</td><td>Alert severity dari sistem monitoring</td></tr>
+                <tr><td>20</td><td>AuditLog</td><td>audit_logs</td><td>Log audit operasi (user, action, IP)</td></tr>
+                <tr><td>21</td><td>MasterData</td><td>master_data</td><td>Dropdown dinamis (tipe aset, lokasi, dsb)</td></tr>
+                <tr><td>22</td><td>AppSetting</td><td>app_settings</td><td>Konfigurasi sistem (SMTP, company, bot)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>5.2 Prisma Migrate & Client Generation</h2>
+        <p>Prosedur saat ada perubahan schema:</p>
+        <pre># 1. Edit prisma/schema.prisma
+
+# 2. Development — buat migration file
+npx prisma migrate dev --name deskripsi_perubahan
+
+# 3. Generate ulang Prisma Client
+npx prisma generate
+
+# 4. Production — sinkronisasi langsung
+npx prisma db push --accept-data-loss</pre>
+        <div class="warn-box">
+            <strong>⚠️ Perhatian:</strong> <code>--accept-data-loss</code> pada db push bisa menghapus data jika ada kolom yang dihapus. Selalu backup database sebelum migrasi di produksi!
+        </div>
+
+        <h2>5.3 Seeding Data Awal</h2>
+        <p>Script <code>prisma/seed.ts</code> membuat data awal yang diperlukan:</p>
+        <ul>
+            <li>Akun SuperAdmin default (email dari .env)</li>
+            <li>Master Data untuk semua dropdown kategori</li>
+            <li>AppSettings default (SMTP config, company info, AI bot status)</li>
+        </ul>
+        <pre>npx prisma db seed</pre>
+    </div>
+
+    <!-- CHAPTER 6 -->
+    <div class="page-break">
+        <h1>6. Prosedur Backup & Restore</h1>
+
+        <h2>6.1 Manual Backup (pg_dump)</h2>
+        <p>Pencadangan database dilakukan dengan utilitas <code>pg_dump</code>:</p>
+
+        <h3>Backup dari Database Lokal (Docker)</h3>
+        <pre>pg_dump -h localhost -U fmsp_user -d fmsp_db \
+  -F c -b -v \
+  -f backup/fmsp_backup_$(date +%Y%m%d_%H%M%S).dump</pre>
+
+        <h3>Backup dari Fly.io (Production)</h3>
+        <pre># 1. Port-forward database Fly.io ke lokal
+fly proxy 5432 -a fmsp-lintasarta-db
+
+# 2. Jalankan pg_dump ke localhost
+pg_dump -h localhost -p 5432 -U fmsp_user -d fmsp_db \
+  -F c -b -v \
+  -f backup/fmsp_prod_$(date +%Y%m%d_%H%M%S).dump</pre>
+
+        <h2>6.2 Manual Restore (pg_restore)</h2>
+        <pre>pg_restore -v -h &lt;host&gt; -U &lt;user&gt; -d &lt;db&gt; \
+  --clean --no-owner \
+  /path/to/backup_file.dump</pre>
+        <p>Flag <code>--clean</code> menghapus tabel lama sebelum restore. Flag <code>--no-owner</code> mencegah error ownership pada environment berbeda.</p>
+
+        <h2>6.3 Backup Otomatis (Cron)</h2>
+        <p>Direkomendasikan memasang cron job pada server database:</p>
+        <pre># Cron setiap hari pukul 01:00 WIB
+0 1 * * * /app/scripts/backup-db.sh >> /var/log/fmsp_backup.log 2>&1
+
+# Retensi: simpan 30 backup terakhir, hapus yang lebih lama
+find /backup/ -name "fmsp_*.dump" -mtime +30 -delete</pre>
+    </div>
+
+    <!-- CHAPTER 7 -->
+    <div class="page-break">
+        <h1>7. Keamanan Sistem</h1>
+
+        <h2>7.1 Autentikasi & JWT</h2>
+        <ul>
+            <li>Password di-hash menggunakan <strong>bcrypt</strong> dengan cost factor tinggi</li>
+            <li>JWT ditandatangani dengan HS256 menggunakan <code>JWT_SECRET</code></li>
+            <li>Token berisi payload: <code>{ userId, email, role, region }</code></li>
+            <li>Expired time diatur pada saat penandatanganan</li>
+            <li>Google SSO memverifikasi token via Google OAuth API endpoint</li>
+        </ul>
+
+        <h2>7.2 RBAC & Permission Matrix</h2>
+        <p>Didefinisikan di <code>src/lib/rbac.ts</code> — 6 role dengan matriks permission per resource per action. Enforced oleh middleware <code>src/lib/rbac-middleware.ts</code> pada setiap API route.</p>
+
+        <h2>7.3 Rate Limiting</h2>
+        <p>Implementasi in-memory rate limiter per IP address:</p>
+        <ul>
+            <li><strong>Login endpoint:</strong> 5 request per 1 menit</li>
+            <li><strong>SSO endpoint:</strong> 10 request per 1 menit</li>
+            <li><strong>Upload endpoint:</strong> 10 request per 1 menit</li>
+            <li><strong>General API:</strong> 60 request per 1 menit</li>
+        </ul>
+
+        <h2>7.4 XSS & Input Validation</h2>
+        <p>Semua input API divalidasi oleh <strong>Zod 4</strong> schemas (<code>src/lib/validators.ts</code>). Fitur proteksi:</p>
+        <ul>
+            <li>String sanitization: strip tag <code>&lt;script&gt;</code>, escape HTML entities</li>
+            <li>Email validation via regex ketat</li>
+            <li>Enum validation untuk field status, role, tipe dokumen</li>
+            <li>Number range validation (positif, max limit)</li>
+            <li>File upload: MIME type whitelist, magic bytes verification, max 10MB</li>
+        </ul>
+
+        <h2>7.5 CORS & HTTP Headers</h2>
+        <ul>
+            <li>CORS: Restricted ke domain yang terdaftar saja</li>
+            <li>Error responses di-sanitize — tidak mengekspos stack trace atau path server</li>
+            <li>API error handler terpusat (<code>src/lib/api-error.ts</code>) mengembalikan format JSON konsisten</li>
+        </ul>
+    </div>
+
+    <!-- CHAPTER 8 -->
+    <div class="page-break">
+        <h1>8. API Endpoints Reference</h1>
+        <table>
+            <thead><tr><th>Method</th><th>Endpoint</th><th>Deskripsi</th><th>Auth</th></tr></thead>
+            <tbody>
+                <tr><td>POST</td><td>/api/auth/login</td><td>Login email + password</td><td>Public</td></tr>
+                <tr><td>POST</td><td>/api/auth/sso</td><td>Login via Google SSO</td><td>Public</td></tr>
+                <tr><td>GET</td><td>/api/auth/me</td><td>Get current user profile</td><td>JWT</td></tr>
+                <tr><td>POST</td><td>/api/auth/forgot-password</td><td>Request password reset</td><td>Public</td></tr>
+                <tr><td>POST</td><td>/api/auth/reset-password</td><td>Execute password reset</td><td>Token</td></tr>
+                <tr><td>GET/POST/PUT/DELETE</td><td>/api/assets</td><td>CRUD aset fisik</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT/DELETE</td><td>/api/legal-documents</td><td>CRUD dokumen legalitas</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST</td><td>/api/notifications</td><td>Notifications CRUD</td><td>JWT</td></tr>
+                <tr><td>POST</td><td>/api/upload</td><td>File upload (10MB max)</td><td>JWT</td></tr>
+                <tr><td>GET/POST/PUT/DELETE</td><td>/api/management/maintenance</td><td>CRUD jadwal PM</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT/DELETE</td><td>/api/management/hrd</td><td>CRUD karyawan</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT/DELETE</td><td>/api/management/inventory</td><td>CRUD inventaris</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT</td><td>/api/management/smk3</td><td>CRUD checklist K3</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST</td><td>/api/management/accounting</td><td>CRUD transaksi keuangan</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST</td><td>/api/management/rab</td><td>CRUD pagu anggaran</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT</td><td>/api/management/workorder</td><td>CRUD work order + approval</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT</td><td>/api/management/vendor</td><td>CRUD vendor & kontrak</td><td>JWT+RBAC</td></tr>
+                <tr><td>GET/POST/PUT/DELETE</td><td>/api/management/users</td><td>Manajemen pengguna</td><td>JWT+Admin</td></tr>
+                <tr><td>GET/PUT</td><td>/api/management/admin</td><td>Master data CRUD</td><td>JWT+SuperAdmin</td></tr>
+                <tr><td>GET/PUT</td><td>/api/management/app-settings</td><td>App settings CRUD</td><td>JWT+SuperAdmin</td></tr>
+                <tr><td>GET/POST</td><td>/api/chat</td><td>AI Copilot (Ollama)</td><td>JWT</td></tr>
+                <tr><td>POST</td><td>/api/cron</td><td>Cron reminder processor</td><td>CRON_SECRET</td></tr>
+                <tr><td>GET</td><td>/api/analytics</td><td>Dashboard analytics data</td><td>JWT</td></tr>
+                <tr><td>GET</td><td>/api/audit-logs</td><td>Audit log viewer</td><td>JWT+Admin</td></tr>
+                <tr><td>GET</td><td>/api/reports</td><td>Compliance report generator</td><td>JWT</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- CHAPTER 9 -->
+    <div class="page-break">
+        <h1>9. Relasi Tabel Database (ERD)</h1>
+
+        <h2>9.1 Diagram ERD</h2>
+        <div class="img-container">
+            <img src="erd_diagram.png" alt="ERD Diagram">
+            <div class="img-caption">Gambar 9.1: Diagram Hubungan Entitas (ERD) Database FMSP Lintasarta — 22 Tabel</div>
+        </div>
+    </div>
+
+    <div class="page-break">
+        <h2>9.2 Hubungan Foreign Key</h2>
+        <table>
+            <thead><tr><th>Tabel Asal</th><th>Kolom FK</th><th>Tabel Referensi</th><th>ON DELETE</th><th>Kardinalitas</th></tr></thead>
+            <tbody>
+                <tr><td>PasswordResetRequest</td><td>userId</td><td>User</td><td>CASCADE</td><td>N:1</td></tr>
+                <tr><td>PushSubscription</td><td>userId</td><td>User</td><td>CASCADE</td><td>N:1</td></tr>
+                <tr><td>AssetTransfer</td><td>assetId</td><td>Asset</td><td>CASCADE</td><td>N:1</td></tr>
+                <tr><td>LegalDocument</td><td>assetId</td><td>Asset</td><td>CASCADE</td><td>N:1</td></tr>
+                <tr><td>MaintenanceSchedule</td><td>assetId</td><td>Asset</td><td>CASCADE</td><td>N:1</td></tr>
+                <tr><td>WorkOrder</td><td>assetId</td><td>Asset</td><td>—</td><td>N:1 (optional)</td></tr>
+                <tr><td>AccountingTransaction</td><td>rabBudgetId</td><td>RabBudget</td><td>—</td><td>N:1 (optional)</td></tr>
+            </tbody>
+        </table>
+
+        <h2>9.3 Database Indexes</h2>
+        <p>Index database dikonfigurasi pada kolom-kolom yang sering di-query untuk performa optimal:</p>
+        <table>
+            <thead><tr><th>Tabel</th><th>Index Columns</th><th>Tujuan</th></tr></thead>
+            <tbody>
+                <tr><td>Asset</td><td>type, status, location</td><td>Filter aset per tipe/status/lokasi</td></tr>
+                <tr><td>LegalDocument</td><td>expiryDate, complianceStatus, assetId</td><td>Query dokumen yang akan expired</td></tr>
+                <tr><td>Notification</td><td>status, scheduledAt</td><td>Cron processor pending notifications</td></tr>
+                <tr><td>MaintenanceSchedule</td><td>nextDue, status</td><td>PM overdue checker</td></tr>
+                <tr><td>VendorContract</td><td>endDate, status</td><td>Kontrak expiring filter</td></tr>
+                <tr><td>WorkOrder</td><td>status, priority, assignedTo, approvalStatus</td><td>Work order queue management</td></tr>
+                <tr><td>AuditLog</td><td>user, action, timestamp</td><td>Audit trail search</td></tr>
+                <tr><td>TimeSeries</td><td>deviceId + metric + timestamp</td><td>IoT data query optimization</td></tr>
+                <tr><td>Employee</td><td>role, department</td><td>Staff filter per jabatan</td></tr>
+                <tr><td>MasterData</td><td>category</td><td>Dropdown data lookup</td></tr>
+                <tr><td>AppSetting</td><td>group</td><td>Settings group query</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- CHAPTER 10 -->
+    <div class="page-break">
+        <h1>10. Troubleshooting</h1>
+
+        <table>
+            <thead><tr><th>Masalah</th><th>Penyebab</th><th>Solusi</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>Aplikasi tidak bisa start</td>
+                    <td>JWT_SECRET masih default</td>
+                    <td>Set JWT_SECRET unik: <code>openssl rand -hex 64</code></td>
+                </tr>
+                <tr>
+                    <td>Error "Cannot connect to database"</td>
+                    <td>DATABASE_URL salah / PostgreSQL down</td>
+                    <td>Verifikasi koneksi: <code>psql $DATABASE_URL</code></td>
+                </tr>
+                <tr>
+                    <td>Google SSO error "Invalid client_id"</td>
+                    <td>GOOGLE_CLIENT_ID tidak valid</td>
+                    <td>Cek di Google Cloud Console → Credentials</td>
+                </tr>
+                <tr>
+                    <td>Email notifikasi tidak terkirim</td>
+                    <td>Konfigurasi SMTP salah</td>
+                    <td>Test via Admin → Pengaturan SMTP → Kirim Test Email</td>
+                </tr>
+                <tr>
+                    <td>User terkunci (locked)</td>
+                    <td>5x gagal login</td>
+                    <td>Tunggu 15 menit atau reset via Admin → Manajemen User</td>
+                </tr>
+                <tr>
+                    <td>AI Copilot offline</td>
+                    <td>Server Ollama tidak berjalan</td>
+                    <td><code>ollama serve</code> lalu <code>ollama pull qwen2.5:1.5b</code></td>
+                </tr>
+                <tr>
+                    <td>Migration error di Fly.io</td>
+                    <td>Schema conflict</td>
+                    <td>Backup → <code>fly ssh console</code> → <code>npx prisma db push --force-reset</code></td>
+                </tr>
+                <tr>
+                    <td>Upload gagal</td>
+                    <td>File > 10MB atau tipe tidak diizinkan</td>
+                    <td>Max 10MB. Tipe: PNG, JPG, PDF, DOCX</td>
+                </tr>
+                <tr>
+                    <td>Cron tidak jalan</td>
+                    <td>CRON_SECRET tidak diset</td>
+                    <td>Set CRON_SECRET di .env dan di external cron caller</td>
+                </tr>
+                <tr>
+                    <td>Push notification tidak muncul</td>
+                    <td>VAPID keys tidak valid</td>
+                    <td>Regenerate: <code>npx web-push generate-vapid-keys</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Kontak Tim Teknis</h2>
+        <table>
+            <thead><tr><th>Tim</th><th>Kontak</th><th>Lingkup</th></tr></thead>
+            <tbody>
+                <tr><td>IT Infrastructure</td><td>it-infra@lintasarta.co.id</td><td>Server, database, deployment, backup</td></tr>
+                <tr><td>DevOps</td><td>devops@lintasarta.co.id</td><td>CI/CD, Docker, Fly.io</td></tr>
+                <tr><td>Keamanan Informasi</td><td>infosec@lintasarta.co.id</td><td>Security audit, penetration testing</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>

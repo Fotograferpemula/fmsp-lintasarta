@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building2, 
   FileText, 
@@ -21,6 +21,7 @@ import {
   Calendar,
   Lock,
   ChevronRight,
+  ChevronDown,
   Database,
   Smartphone,
   Sun,
@@ -40,7 +41,12 @@ import {
   Trash2,
   QrCode,
   Upload,
-  Settings
+  Camera,
+  X,
+  Settings,
+  Bot,
+  HelpCircle,
+  BookOpen
 } from 'lucide-react';
 
 import HrdView from '@/components/management/HrdView';
@@ -56,6 +62,11 @@ import AuditLogView from '@/components/management/AuditLogView';
 import AdminView from '@/components/management/AdminView';
 import UserManagementView from '@/components/management/UserManagementView';
 import AnalyticsView from '@/components/management/AnalyticsView';
+import AiConfigView from '@/components/management/AiConfigView';
+import DocumentationView from '@/components/management/DocumentationView';
+import PushNotificationPrompt from '@/components/PushNotificationPrompt';
+import HelpGuide from '@/components/HelpGuide';
+import HelpBot from '@/components/HelpBot';
 import { hasPermission, getRoleConfig, type PermissionKey } from '@/lib/rbac';
 
 // Tipe data berdasarkan model Prisma
@@ -71,6 +82,7 @@ interface Asset {
   purchaseCost?: number;
   expectedLifeYrs?: number;
   lifecycleStatus?: string;
+  photos?: string[];
   createdAt: string;
   updatedAt: string;
   transfers: AssetTransfer[];
@@ -113,9 +125,9 @@ interface Notification {
 export default function Home() {
   // State Autentikasi SSO Lintasarta
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginStep, setLoginStep] = useState<'form' | 'mfa' | 'success'>('form');
+  const [loginStep, setLoginStep] = useState<'form' | 'mfa' | 'success' | 'forgot'>('form');
   const [email, setEmail] = useState('admin@lintasarta.co.id');
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState('Admin@2026');
   const [mfaTimer, setMfaTimer] = useState(5);
   const [authToken, setAuthToken] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -126,7 +138,7 @@ export default function Home() {
   const isDark = theme === 'dark';
 
   // State Utama Aplikasi
-  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin' | 'users' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin' | 'users' | 'analytics' | 'aiconfig' | 'docs'>('overview');
   // Sub-tab states for consolidated menus
   const [assetSubTab, setAssetSubTab] = useState<'aset' | 'legal'>('aset');
   const [hrdSubTab, setHrdSubTab] = useState<'karyawan' | 'security'>('karyawan');
@@ -152,6 +164,7 @@ export default function Home() {
   const [notifBadge, setNotifBadge] = useState(0);
   const [sseNotifs, setSseNotifs] = useState<{ id: string; title: string; message: string; timestamp: string }[]>([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [phase2Open, setPhase2Open] = useState(false);
 
   // Modal State
   const [showAssetModal, setShowAssetModal] = useState(false);
@@ -171,6 +184,36 @@ export default function Home() {
     bookValue: '',
     status: 'good'
   });
+  const [assetPhotos, setAssetPhotos] = useState<string[]>([]);
+  const [assetPhotoUploading, setAssetPhotoUploading] = useState(false);
+  const assetFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAssetPhotoUpload = async (files: FileList) => {
+    setAssetPhotoUploading(true);
+    const newPhotos: string[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      if (file.size > 10 * 1024 * 1024) { alert(`File ${file.name} melebihi 10MB`); continue; }
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: fd,
+        });
+        const data = await res.json();
+        if (data.success) newPhotos.push(data.data.url);
+      } catch { console.error('Upload failed for', file.name); }
+    }
+    setAssetPhotos(prev => [...prev, ...newPhotos]);
+    setAssetPhotoUploading(false);
+  };
+
+  const removeAssetPhoto = (idx: number) => {
+    setAssetPhotos(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isEditingAsset, setIsEditingAsset] = useState(false);
@@ -333,13 +376,15 @@ export default function Home() {
           location: newAsset.location,
           status: newAsset.status,
           bookValue: newAsset.bookValue,
-          specs
+          specs,
+          photos: assetPhotos
         })
       }).then(r => r.json());
 
       if (res.success) {
         setShowAssetModal(false);
         setNewAsset({ name: '', type: 'facility', location: '', specBrand: '', specCapacity: '', specYear: '', specNote: '', bookValue: '', status: 'good' });
+        setAssetPhotos([]);
         fetchData();
       } else {
         alert(res.error);
@@ -654,7 +699,7 @@ export default function Home() {
                   <input type="checkbox" defaultChecked className="mr-2 rounded border-[#1A2744] bg-[#070E1B] text-[#1769FF] focus:ring-0 focus:ring-offset-0" />
                   Ingat saya
                 </label>
-                <a href="#" className="text-[#1769FF] hover:underline">Lupa Password?</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); setLoginStep('forgot'); setLoginError(''); }} className="text-[#1769FF] hover:underline">Lupa Password?</a>
               </div>
 
               <button 
@@ -696,6 +741,65 @@ export default function Home() {
                 <h3 className="text-lg font-bold text-white">Akses Disetujui</h3>
                 <p className="text-sm text-zinc-400">Selamat datang kembali di FMSP Lintasarta.</p>
               </div>
+            </div>
+          )}
+
+          {loginStep === 'forgot' && (
+            <div className="space-y-5">
+              <div className="text-center space-y-2">
+                <div className="flex justify-center">
+                  <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <Lock className="w-6 h-6 text-amber-400" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-white">Lupa Password</h3>
+                <p className="text-xs text-zinc-400 px-4">
+                  Masukkan email Anda. Permintaan reset akan dikirim ke administrator untuk persetujuan.
+                </p>
+              </div>
+
+              {loginError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2 text-xs text-red-400 text-center">
+                  {loginError}
+                </div>
+              )}
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setLoginError('');
+                try {
+                  const r = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, reason: 'Lupa password' }),
+                  });
+                  const data = await r.json();
+                  if (data.success) {
+                    setLoginError('');
+                    setLoginStep('form');
+                    alert('✅ Permintaan reset password telah dikirim ke administrator untuk persetujuan. Silakan hubungi admin Anda.');
+                  } else {
+                    setLoginError(data.error);
+                  }
+                } catch { setLoginError('Gagal mengirim permintaan'); }
+              }} className="space-y-4">
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1.5">Email</label>
+                  <input 
+                    type="email" required value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#070E1B] border border-[#1A2744] rounded-xl text-white focus:outline-none focus:border-[#1769FF] transition-colors text-sm"
+                    placeholder="email@lintasarta.co.id"
+                  />
+                </div>
+                <button type="submit" className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white rounded-xl font-semibold transition-all text-sm">
+                  Kirim Permintaan Reset
+                </button>
+                <button type="button" onClick={() => { setLoginStep('form'); setLoginError(''); }}
+                  className="w-full py-2 text-sm text-zinc-400 hover:text-white transition-colors">
+                  ← Kembali ke Login
+                </button>
+              </form>
             </div>
           )}
 
@@ -804,13 +908,6 @@ export default function Home() {
             </div>
 
             <button 
-              onClick={() => setActiveTab('hrd')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'hrd' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <Users className="w-4 h-4" />
-              HRD & Security
-            </button>
-            <button 
               onClick={() => setActiveTab('inventory')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'inventory' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
             >
@@ -823,13 +920,6 @@ export default function Home() {
             >
               <HeartPulse className="w-4 h-4" />
               SMK3 Safety
-            </button>
-            <button 
-              onClick={() => setActiveTab('accounting')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'accounting' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <DollarSign className="w-4 h-4" />
-              Keuangan
             </button>
 
             {/* Header Operations */}
@@ -850,13 +940,61 @@ export default function Home() {
               <FileSignature className="w-4 h-4" />
               Vendor & Contract
             </button>
-            <button 
-              onClick={() => setActiveTab('workorder')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'workorder' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <ClipboardList className="w-4 h-4" />
-              Work Order / Ticket
-            </button>
+
+            {/* ── Phase 2 Advance Menu (Admin+Manager+SuperAdmin only) ── */}
+            {currentUser && ['superadmin', 'manager_fms', 'admin_pusat'].includes(currentUser.role) && (
+              <>
+                <div className="pt-4 pb-2 px-4">
+                  <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Phase 2</span>
+                </div>
+                <button
+                  onClick={() => setPhase2Open(!phase2Open)}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    ['hrd', 'accounting', 'workorder'].includes(activeTab)
+                      ? 'bg-[#1769FF]/10 text-[#4A8AFF] border border-[#1769FF]/20'
+                      : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Shield className="w-4 h-4" />
+                    Phase 2 Advance Menu
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${phase2Open ? 'rotate-180' : ''}`} />
+                </button>
+                {phase2Open && (
+                  <div className="ml-4 pl-3 border-l-2 border-[#1769FF]/20 space-y-0.5 mt-0.5">
+                    <button 
+                      onClick={() => setActiveTab('hrd')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'hrd' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      HRD & Security
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('accounting')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'accounting' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+                    >
+                      <DollarSign className="w-3.5 h-3.5" />
+                      Keuangan
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('workorder')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'workorder' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+                    >
+                      <ClipboardList className="w-3.5 h-3.5" />
+                      Work Order / Ticket
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('aiconfig')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'aiconfig' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+                    >
+                      <Bot className="w-3.5 h-3.5" />
+                      AI Configuration
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Header Analytics */}
             <div className="pt-4 pb-2 px-4">
@@ -899,6 +1037,15 @@ export default function Home() {
               >
                 <Settings className="w-4 h-4" />
                 Admin Master Data
+              </button>
+            )}
+            {currentUser && ['superadmin', 'manager_fms', 'admin_pusat', 'admin_regional', 'admin_lokasi'].includes(currentUser.role) && (
+              <button 
+                onClick={() => setActiveTab('docs')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'docs' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
+              >
+                <BookOpen className="w-4 h-4" />
+                Dokumen & Manual
               </button>
             )}
           </nav>
@@ -974,12 +1121,15 @@ export default function Home() {
             {activeTab === 'admin' && 'Admin — Master Data Management'}
             {activeTab === 'users' && 'Manajemen Pengguna'}
             {activeTab === 'analytics' && 'Analytics & Insights — Visualisasi Data'}
+            {activeTab === 'aiconfig' && 'Konfigurasi Asisten AI (Copilot)'}
+            {activeTab === 'docs' && 'Dokumen & Buku Manual FMSP Lintasarta'}
           </h1>
           </div>{/* end hamburger+title */}
 
           <div className="flex items-center gap-2 md:gap-4">
-            
-            {/* Bell Notification dengan SSE badge */}
+
+            {/* Help Button */}
+            <HelpGuide activeTab={activeTab} isDark={isDark} />
             <div className="relative">
               <button
                 onClick={() => { setShowNotifDropdown(s => !s); if (notifBadge > 0) setNotifBadge(0); }}
@@ -1689,7 +1839,13 @@ export default function Home() {
                               <Mail className="w-4 h-4 text-[#1769FF] shrink-0" />
                               <h4 className={`text-xs font-bold ${c_text_title}`}>{notif.title}</h4>
                             </div>
-                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase ${notif.status === 'sent' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase ${
+                              notif.status === 'sent' 
+                                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                                : notif.status === 'failed'
+                                ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            }`}>
                               {notif.status}
                             </span>
                           </div>
@@ -1792,6 +1948,12 @@ export default function Home() {
               <AnalyticsView token={authToken} isDark={isDark} />
             )}
 
+            {/* ────────── TAB 18: AI CONFIGURATION ────────── */}
+            {activeTab === 'aiconfig' && <AiConfigView isDark={isDark} token={authToken} />}
+
+            {/* ────────── TAB 19: DOKUMEN & MANUAL ────────── */}
+            {activeTab === 'docs' && <DocumentationView isDark={isDark} />}
+
           </div>
         )}
       </main>
@@ -1803,7 +1965,17 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">Tambah Aset Fisik Baru</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">Tambah Aset Fisik Baru</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_add_asset' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowAssetModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
 
@@ -1918,7 +2090,64 @@ export default function Home() {
                 />
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold transition-colors mt-4">
+              {/* Foto Aset */}
+              <div>
+                <label className="block text-zinc-500 mb-1">📷 Foto Aset</label>
+                <input
+                  ref={assetFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => e.target.files && handleAssetPhotoUpload(e.target.files)}
+                />
+                <div
+                  onClick={() => assetFileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files.length) handleAssetPhotoUpload(e.dataTransfer.files); }}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                    isDark
+                      ? 'border-zinc-700 hover:border-[#1769FF] hover:bg-[#1769FF]/5'
+                      : 'border-zinc-300 hover:border-[#1769FF] hover:bg-[#1769FF]/5'
+                  }`}
+                >
+                  {assetPhotoUploading ? (
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#1769FF]" />
+                      <span className="text-zinc-500 text-xs">Mengupload foto...</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 py-1">
+                      <Camera className="w-6 h-6 text-[#1769FF]/60" />
+                      <span className="text-[10px] text-zinc-500">Klik atau seret foto aset ke sini</span>
+                      <span className="text-[9px] text-zinc-400">PNG, JPG — Maks 10MB per file</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Photo Previews */}
+                {assetPhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {assetPhotos.map((url, idx) => (
+                      <div key={idx} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-zinc-700">
+                        <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeAssetPhoto(idx)}
+                          className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[8px] text-white text-center py-0.5">
+                          {idx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button type="submit" disabled={assetPhotoUploading} className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] disabled:opacity-50 text-white rounded-lg font-semibold transition-colors mt-4">
                 Simpan Aset
               </button>
             </form>
@@ -1936,7 +2165,19 @@ export default function Home() {
                 <span className={`text-[10px] border px-2 py-0.5 rounded font-semibold uppercase tracking-wider ${isDark ? 'bg-zinc-800/80 border-zinc-700/50 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-500'}`}>
                   {selectedAsset.type === 'land' ? 'Tanah' : selectedAsset.type === 'office' ? 'Gedung Kantor' : selectedAsset.type === 'facility' ? 'Fasilitas' : 'Kendaraan'}
                 </span>
-                <h3 className={`text-lg font-bold mt-2 ${c_text_title}`}>{isEditingAsset ? 'Edit Aset' : selectedAsset.name}</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <h3 className={`text-lg font-bold ${c_text_title}`}>{isEditingAsset ? 'Edit Aset' : selectedAsset.name}</h3>
+                  {isEditingAsset && (
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_edit_asset' } }))}
+                      className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                      title="Lihat Bantuan Form"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 {!isEditingAsset && (
@@ -2049,6 +2290,28 @@ export default function Home() {
                   </div>
                 ) : (<p className="text-xs text-zinc-500 italic">Belum ada spesifikasi</p>)}
               </div>
+              {/* Foto Aset */}
+              <div className={`p-4 rounded-xl border ${c_inner_bg}`}>
+                <p className={`text-xs font-bold mb-3 ${c_text_title}`}>📷 Foto Aset ({selectedAsset.photos?.length || 0})</p>
+                {selectedAsset.photos && selectedAsset.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedAsset.photos.map((url: string, idx: number) => (
+                      <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
+                        className="relative rounded-xl overflow-hidden border border-zinc-700 hover:ring-2 hover:ring-[#1769FF] transition-all cursor-zoom-in group">
+                        <img src={url} alt={`Foto aset ${idx + 1}`} className="w-full h-32 object-cover" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-1.5">
+                          <p className="text-[9px] text-white font-bold">Foto {idx + 1}</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`text-center py-6 rounded-xl border-2 border-dashed ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-zinc-200 text-zinc-400'}`}>
+                    <Camera className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-[10px]">Belum ada foto aset</p>
+                  </div>
+                )}
+              </div>
               <div className={`p-4 rounded-xl border ${c_inner_bg}`}>
                 <p className={`text-xs font-bold mb-3 ${c_text_title}`}>Riwayat Mutasi ({selectedAsset.transfers?.length || 0})</p>
                 {selectedAsset.transfers && selectedAsset.transfers.length > 0 ? (
@@ -2091,7 +2354,17 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">Mutasi Lokasi Aset</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">Mutasi Lokasi Aset</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_transfer' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowTransferModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
 
@@ -2138,7 +2411,17 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">Tambah Dokumen Legalitas Aset</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">Tambah Dokumen Legalitas Aset</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_add_doc' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowDocModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
 
@@ -2184,12 +2467,29 @@ export default function Home() {
                 </div>
                 <div>
                   <label className="block text-zinc-500 mb-1">URL / Lokasi Berkas PDF</label>
-                  <input 
-                    type="text" 
-                    value={newDoc.documentUrl}
-                    onChange={(e) => setNewDoc({ ...newDoc, documentUrl: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg outline-none ${c_input}`} 
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={newDoc.documentUrl}
+                      onChange={(e) => setNewDoc({ ...newDoc, documentUrl: e.target.value })}
+                      className={`flex-1 px-3 py-2 border rounded-lg outline-none ${c_input}`} 
+                    />
+                    <label className="px-3 py-2 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold cursor-pointer transition-all flex items-center gap-1.5 shrink-0 select-none">
+                      <Upload className={`w-3.5 h-3.5 ${uploadLoading ? 'animate-spin' : ''}`} />
+                      <span>{uploadLoading ? 'Uploading...' : 'Upload'}</span>
+                      <input 
+                        type="file" 
+                        accept="application/pdf,image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleFileUpload(e.target.files[0]);
+                          }
+                        }}
+                        disabled={uploadLoading}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -2229,7 +2529,17 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">Perpanjang Dokumen Legalitas</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">Perpanjang Dokumen Legalitas</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_renew_doc' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowRenewModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
 
@@ -2266,9 +2576,21 @@ export default function Home() {
           <div className={`w-full max-w-sm border rounded-2xl shadow-2xl overflow-hidden ${c_modal}`}>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: isDark ? '#1A2744' : '#E0E8F5' }}>
-              <div>
-                <h3 className="text-sm font-bold">QR Code Aset</h3>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Scan untuk lihat detail aset</p>
+              <div className="flex items-center gap-2">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-bold">QR Code Aset</h3>
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_qr' } }))}
+                      className="p-0.5 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                      title="Lihat Bantuan Form"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Scan untuk lihat detail aset</p>
+                </div>
               </div>
               <button onClick={() => setShowQrModal(false)} className="text-zinc-500 hover:text-red-500 text-xs font-medium transition-colors">✕ Tutup</button>
             </div>
@@ -2365,6 +2687,12 @@ export default function Home() {
           ))}
         </div>
       </nav>
+
+      {/* Push Notification Prompt */}
+      <PushNotificationPrompt token={authToken} isDark={isDark} />
+
+      {/* Floating Chat Copilot (Local AI) */}
+      <HelpBot isDark={isDark} />
 
     </div>
   );
