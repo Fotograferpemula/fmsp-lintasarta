@@ -917,7 +917,7 @@ export default function Home() {
             {/* helper for nav items */}
             {([
               { tab: 'overview', icon: <Database className="w-4 h-4" />, label: 'Overview', size: 'lg' },
-              { tab: 'assets', icon: <Building2 className="w-4 h-4" />, label: 'Aset & Perizinan', size: 'lg' },
+              { tab: 'analytics', icon: <TrendingUp className="w-4 h-4" />, label: 'Analytics & Charts', size: 'lg' },
               { tab: 'notifications', icon: <Bell className="w-4 h-4" />, label: 'Reminder & Alerts', size: 'lg', badge: notifications.filter(n => n.status === 'pending').length > 0 },
             ] as { tab: string; icon: React.ReactNode; label: string; size: string; badge?: boolean }[]).map(({ tab, icon, label, badge }) => (
               <button
@@ -935,16 +935,17 @@ export default function Home() {
               </button>
             ))}
 
-            {/* ── Section: Management ── */}
+            {/* ── Section: FMS Document Management ── */}
             <div className="pt-4 pb-1.5 px-3">
               <div className={`flex items-center gap-2`}>
                 <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Management</span>
+                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">FMS Document Management</span>
                 <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
               </div>
             </div>
 
             {([
+              { tab: 'assets', icon: <Building2 className="w-4 h-4" />, label: 'Aset & Perizinan' },
               { tab: 'inventory', icon: <Box className="w-4 h-4" />, label: 'Inventory' },
               { tab: 'smk3', icon: <HeartPulse className="w-4 h-4" />, label: 'SMK3 Safety' },
             ] as { tab: string; icon: React.ReactNode; label: string }[]).map(({ tab, icon, label }) => (
@@ -1019,22 +1020,6 @@ export default function Home() {
                 )}
               </>
             )}
-
-            {/* ── Section: Analytics ── */}
-            <div className="pt-4 pb-1.5 px-3">
-              <div className="flex items-center gap-2">
-                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Analytics</span>
-                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-              </div>
-            </div>
-            <button onClick={() => setActiveTab('analytics')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                activeTab === 'analytics' ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
-              }`}>
-              <TrendingUp className="w-4 h-4" />
-              Analytics & Charts
-            </button>
 
             {/* ── Section: Integration ── */}
             <div className="pt-4 pb-1.5 px-3">
