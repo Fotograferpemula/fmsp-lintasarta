@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, User, Mail, Phone, Calendar, ShieldCheck, Award } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, User, Mail, Phone, Calendar, ShieldCheck, Award, HelpCircle } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -49,13 +49,13 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
 
   // Styles based on theme
   const c_card = isDark ? 'bg-zinc-900/30 border-zinc-800/80 text-white' : 'bg-white border-zinc-200 text-zinc-800 shadow-sm';
-  const c_table_hdr = isDark ? 'bg-zinc-950/40 border-zinc-800/80 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-600';
+  const c_table_hdr = isDark ? 'bg-[#1B1F26]/40 border-zinc-800/80 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-600';
   const c_table_row = isDark ? 'hover:bg-zinc-900/10 border-zinc-800/60' : 'hover:bg-zinc-100/50 border-zinc-200';
-  const c_input = isDark ? 'bg-zinc-950 border-zinc-800 text-white focus:border-[#1769FF]' : 'bg-white border-zinc-200 text-zinc-800 focus:border-[#1769FF]';
+  const c_input = isDark ? 'bg-[#1B1F26] border-zinc-800 text-white focus:border-[#3370FF]' : 'bg-white border-zinc-200 text-zinc-800 focus:border-[#3370FF]';
   const c_modal = isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
   const c_text_title = isDark ? 'text-white' : 'text-zinc-800';
   const c_text_sub = isDark ? 'text-zinc-400' : 'text-zinc-500';
-  const c_inner_bg = isDark ? 'bg-zinc-950/40 border-zinc-800/40' : 'bg-zinc-50 border-zinc-200';
+  const c_inner_bg = isDark ? 'bg-[#1B1F26]/40 border-zinc-800/40' : 'bg-zinc-50 border-zinc-200';
   const c_border = isDark ? 'border-zinc-800/80' : 'border-zinc-200';
 
   const fetchEmployees = async () => {
@@ -188,22 +188,22 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
     <div className="space-y-6">
       {/* Stats row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Total Karyawan</span>
           <h2 className="text-3xl font-extrabold mt-2">{totalCount} Orang</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Terdaftar di database</p>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Karyawan Aktif</span>
           <h2 className="text-3xl font-extrabold mt-2 text-emerald-500">{activeCount} Orang</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Status aktif bekerja</p>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Tim Engineering</span>
-          <h2 className="text-3xl font-extrabold mt-2 text-[#1769FF]">{engineeringCount} Orang</h2>
+          <h2 className="text-3xl font-extrabold mt-2 text-[#3370FF]">{engineeringCount} Orang</h2>
           <p className="text-[10px] text-zinc-500 mt-1">MEP & BAS Operator</p>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Rata-rata Gaji</span>
           <h2 className="text-3xl font-extrabold mt-2 text-indigo-500">{formatRupiah(avgSalary)}</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Gaji pokok bulanan</p>
@@ -211,7 +211,7 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
       </div>
 
       {/* Control bar */}
-      <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-2xl ${c_card}`}>
+      <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-xl ${c_card}`}>
         <div className="relative w-full sm:max-w-xs">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
             <Search className="w-4 h-4" />
@@ -241,7 +241,7 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
 
           <button 
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             Tambah Karyawan
@@ -250,7 +250,7 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
       </div>
 
       {/* Employees Table */}
-      <div className={`border rounded-2xl overflow-hidden ${c_card}`}>
+      <div className={`border rounded-xl overflow-hidden ${c_card}`}>
         {loading ? (
           <div className="p-12 text-center text-zinc-500">Loading data karyawan...</div>
         ) : filtered.length === 0 ? (
@@ -275,7 +275,7 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
                   <tr key={emp.id} className={`transition-colors border-b ${c_table_row}`}>
                     <td className="py-4 px-6 font-semibold">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#0D4FCC]/10 flex items-center justify-center text-[#1769FF]">
+                        <div className="w-8 h-8 rounded-full bg-[#245BDB]/10 flex items-center justify-center text-[#3370FF]">
                           <User className="w-4 h-4" />
                         </div>
                         <div>
@@ -321,7 +321,7 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
                       <div className="flex justify-end gap-2">
                         <button 
                           onClick={() => openEditModal(emp)}
-                          className={`p-1.5 border rounded-lg hover:text-[#1769FF] ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`p-1.5 border rounded-lg hover:text-[#3370FF] ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}
                           title="Edit"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -346,9 +346,19 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-lg border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-lg border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">{editingEmployee ? 'Perbarui Data Karyawan' : 'Tambah Karyawan Baru'}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">{editingEmployee ? 'Perbarui Data Karyawan' : 'Tambah Karyawan Baru'}</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'hrd_add' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
 
@@ -495,7 +505,7 @@ export default function HrdView({ isDark, token }: HrdViewProps) {
                 />
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold transition-colors mt-4">
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold transition-colors mt-4">
                 {editingEmployee ? 'Simpan Perubahan' : 'Simpan Karyawan'}
               </button>
             </form>

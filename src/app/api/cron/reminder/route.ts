@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateCronAuth } from '@/lib/cron-auth';
 import { runReminderJob } from '@/lib/cron-scheduler';
+import { handleApiError } from '@/lib/api-error';
 
 // GET /api/cron/reminder
 // Dijalankan harian pukul 08:00 WIB via Fly.io scheduled machine atau external cron
@@ -23,6 +24,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[CRON REMINDER API ERROR]', error.message);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return handleApiError(error, 'API');
   }
 }

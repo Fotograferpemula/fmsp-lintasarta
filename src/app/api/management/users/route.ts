@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { withAuth, withRole, JWTPayload, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { hasPermission, canManageRole, getAssignableRoles, ROLE_NAMES, getRoleConfig } from '@/lib/rbac';
+import { PasswordCreateSchema } from '@/lib/validators';
+import { sendEmail } from '@/lib/email-service';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 // ── GET /api/management/users — Daftar semua user ─────────
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
@@ -10,9 +13,17 @@ async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
     select: {
       id: true, email: true, name: true, role: true,
       isActive: true, department: true, phone: true, region: true,
+      failedLoginAttempts: true, lockedUntil: true,
       createdAt: true, updatedAt: true,
     },
     orderBy: [{ isActive: 'desc' }, { role: 'asc' }, { name: 'asc' }],
+  });
+
+  // Fetch pending reset requests
+  const pendingResets = await prisma.passwordResetRequest.findMany({
+    where: { status: 'pending' },
+    include: { user: { select: { email: true, name: true } } },
+    orderBy: { requestedAt: 'desc' },
   });
 
   // Return assignable roles for the form
@@ -22,7 +33,7 @@ async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
     color: getRoleConfig(r).color,
   }));
 
-  return NextResponse.json({ success: true, data: users, assignableRoles });
+  return NextResponse.json({ success: true, data: users, assignableRoles, pendingResets });
 }
 
 // ── POST /api/management/users — Buat user baru ───────────
@@ -40,8 +51,11 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
   if (!canManageRole(user.role, role)) {
     return NextResponse.json({ success: false, error: 'Tidak dapat membuat user dengan role yang sama atau lebih tinggi' }, { status: 403 });
   }
-  if (password.length < 8) {
-    return NextResponse.json({ success: false, error: 'Password minimal 8 karakter' }, { status: 400 });
+
+  // Validate password complexity (Lintasarta IT Policy)
+  const pwdResult = PasswordCreateSchema.safeParse(password);
+  if (!pwdResult.success) {
+    return NextResponse.json({ success: false, error: pwdResult.error.issues[0].message }, { status: 400 });
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -61,17 +75,113 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
       action: 'USER_CREATED',
       resource: 'User',
       details: `User baru: ${newUser.email} (${getRoleConfig(newUser.role).label})`,
+        ip: req.clientIp || '0.0.0.0',
     },
   });
 
   return NextResponse.json({ success: true, data: newUser }, { status: 201 });
 }
 
-// ── PATCH /api/management/users — Update user ─────────────
+// ── PATCH /api/management/users — Update user / Unlock / Approve Reset ──
 async function handlePatch(req: AuthenticatedRequest, user: JWTPayload) {
   const body = await req.json();
-  const { id, name, role, isActive, department, phone, region, newPassword } = body;
+  const { id, name, role, isActive, department, phone, region, newPassword, unlock, approveResetId, rejectResetId } = body;
 
+  // ── Handle Unlock ──
+  if (unlock && id) {
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) return NextResponse.json({ success: false, error: 'User tidak ditemukan' }, { status: 404 });
+    if (!canManageRole(user.role, targetUser.role)) {
+      return NextResponse.json({ success: false, error: 'Tidak dapat unlock user dengan role yang sama atau lebih tinggi' }, { status: 403 });
+    }
+
+    await prisma.user.update({
+      where: { id },
+      data: { failedLoginAttempts: 0, lockedUntil: null, lastFailedLogin: null },
+    });
+    await prisma.auditLog.create({
+      data: { user: user.email, action: 'USER_UNLOCKED', resource: 'User', details: `Admin ${user.email} membuka kunci akun ${targetUser.email}.`, ip: req.clientIp || '0.0.0.0' },
+    });
+    return NextResponse.json({ success: true, message: `Akun ${targetUser.email} berhasil di-unlock.` });
+  }
+
+  // ── Handle Approve Reset Password ──
+  if (approveResetId) {
+    const resetReq = await prisma.passwordResetRequest.findUnique({
+      where: { id: approveResetId },
+      include: { user: true },
+    });
+    if (!resetReq || resetReq.status !== 'pending') {
+      return NextResponse.json({ success: false, error: 'Permintaan reset tidak ditemukan atau sudah diproses' }, { status: 404 });
+    }
+    if (!canManageRole(user.role, resetReq.user.role)) {
+      return NextResponse.json({ success: false, error: 'Tidak dapat approve reset untuk user dengan role yang sama atau lebih tinggi' }, { status: 403 });
+    }
+
+    // Generate reset token (valid 1 hour)
+    const plainToken = crypto.randomUUID();
+    const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // SECURITY: Hash token before storing in DB (never store plaintext)
+    const hashedToken = await bcrypt.hash(plainToken, 10);
+
+    await prisma.passwordResetRequest.update({
+      where: { id: approveResetId },
+      data: { status: 'approved', reviewedBy: user.email, reviewedAt: new Date(), token: hashedToken, tokenExpiry },
+    });
+
+    await prisma.auditLog.create({
+      data: { user: user.email, action: 'PASSWORD_RESET_APPROVED', resource: 'User', details: `Admin ${user.email} menyetujui reset password untuk ${resetReq.user.email}. Token berlaku 1 jam.`, ip: req.clientIp || '0.0.0.0' },
+    });
+
+    // SECURITY: Send token via email only (not in response or in-app notification)
+    try {
+      await sendEmail({
+        to: resetReq.user.email,
+        subject: '🔑 Reset Password FMSP Disetujui',
+        message: `Halo ${resetReq.user.name},\n\nPermintaan reset password Anda telah disetujui oleh ${user.name}.\n\nGunakan token berikut untuk mereset password Anda (berlaku 1 jam):\n\n${plainToken}\n\nJika Anda tidak merasa meminta reset password, segera hubungi administrator.`,
+      });
+    } catch (emailErr) {
+      console.error('[RESET] Failed to send email with reset token:', emailErr);
+    }
+
+    // In-app notification (generic, no token)
+    await prisma.notification.create({
+      data: {
+        recipientEmail: resetReq.user.email,
+        type: 'dashboard',
+        title: '✅ Reset Password Disetujui',
+        message: `Permintaan reset password Anda telah disetujui oleh ${user.name}. Cek email Anda untuk mendapatkan token reset (berlaku 1 jam).`,
+        scheduledAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({ success: true, message: 'Reset password disetujui. Token dikirim ke email user.' });
+  }
+
+  // ── Handle Reject Reset Password ──
+  if (rejectResetId) {
+    const resetReq = await prisma.passwordResetRequest.findUnique({
+      where: { id: rejectResetId },
+      include: { user: true },
+    });
+    if (!resetReq || resetReq.status !== 'pending') {
+      return NextResponse.json({ success: false, error: 'Permintaan reset tidak ditemukan atau sudah diproses' }, { status: 404 });
+    }
+
+    await prisma.passwordResetRequest.update({
+      where: { id: rejectResetId },
+      data: { status: 'rejected', reviewedBy: user.email, reviewedAt: new Date() },
+    });
+
+    await prisma.auditLog.create({
+      data: { user: user.email, action: 'PASSWORD_RESET_REJECTED', resource: 'User', details: `Admin ${user.email} menolak permintaan reset password dari ${resetReq.user.email}.`, ip: req.clientIp || '0.0.0.0' },
+    });
+
+    return NextResponse.json({ success: true, message: 'Permintaan reset password ditolak.' });
+  }
+
+  // ── Normal user update ──
   if (!id) return NextResponse.json({ success: false, error: 'ID wajib diisi' }, { status: 400 });
 
   const targetUser = await prisma.user.findUnique({ where: { id } });
@@ -99,8 +209,14 @@ async function handlePatch(req: AuthenticatedRequest, user: JWTPayload) {
   if (department !== undefined) updateData.department = department;
   if (phone !== undefined) updateData.phone = phone;
   if (region !== undefined) updateData.region = region;
-  if (newPassword && newPassword.length >= 8) {
+  if (newPassword) {
+    const pwdResult = PasswordCreateSchema.safeParse(newPassword);
+    if (!pwdResult.success) {
+      return NextResponse.json({ success: false, error: pwdResult.error.issues[0].message }, { status: 400 });
+    }
     updateData.passwordHash = await bcrypt.hash(newPassword, 12);
+    updateData.failedLoginAttempts = 0;
+    updateData.lockedUntil = null;
   }
 
   const updated = await prisma.user.update({
@@ -115,6 +231,7 @@ async function handlePatch(req: AuthenticatedRequest, user: JWTPayload) {
       action: 'USER_UPDATED',
       resource: 'User',
       details: `Updated ${targetUser.email}: ${JSON.stringify(updateData).replace(/"passwordHash":"[^"]*"/, '"passwordHash":"***"')}`,
+        ip: req.clientIp || '0.0.0.0',
     },
   });
 
@@ -145,6 +262,7 @@ async function handleDelete(req: AuthenticatedRequest, user: JWTPayload) {
       action: 'USER_DEACTIVATED',
       resource: 'User',
       details: `User ${targetUser.email} (${getRoleConfig(targetUser.role).label}) dinonaktifkan`,
+        ip: req.clientIp || '0.0.0.0',
     },
   });
 

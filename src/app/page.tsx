@@ -46,7 +46,9 @@ import {
   Settings,
   Bot,
   HelpCircle,
-  BookOpen
+  BookOpen,
+  ExternalLink,
+  LayoutDashboard
 } from 'lucide-react';
 
 import HrdView from '@/components/management/HrdView';
@@ -243,18 +245,18 @@ export default function Home() {
   // ────────────────────────────────────────────────────────
   // PEMETAAN KELAS GAYA DINAMIS (LINTASARTA THEME)
   // ────────────────────────────────────────────────────────
-  const c_bg = isDark ? 'bg-[#070E1B] text-zinc-100' : 'bg-[#F4F7FC] text-zinc-800';
-  const c_sidebar = isDark ? 'bg-[#0B1628]/95 border-[#1A2744]' : 'bg-white border-[#E0E8F5]';
-  const c_header = isDark ? 'bg-[#0B1628]/40 border-[#1A2744]' : 'bg-white/90 border-[#E0E8F5]';
-  const c_card = isDark ? 'bg-[#0F1C33]/60 border-[#1A2744]' : 'bg-white border-[#E0E8F5] shadow-sm';
-  const c_table_hdr = isDark ? 'bg-[#0A1525] border-[#1A2744] text-zinc-400' : 'bg-[#F0F4FA] border-[#E0E8F5] text-zinc-600';
-  const c_table_row = isDark ? 'hover:bg-[#111D35]/60 divide-[#1A2744]' : 'hover:bg-[#F0F4FA]/50 divide-[#E0E8F5]';
-  const c_input = isDark ? 'bg-[#070E1B] border-[#1A2744] text-white focus:border-[#1769FF]' : 'bg-white border-[#D0D8E8] text-zinc-800 focus:border-[#1769FF]';
-  const c_modal = isDark ? 'bg-[#0F1C33] border-[#1A2744] text-white' : 'bg-white border-[#E0E8F5] text-zinc-800';
-  const c_text_title = isDark ? 'text-white' : 'text-zinc-800';
-  const c_text_sub = isDark ? 'text-zinc-400' : 'text-zinc-500';
-  const c_border = isDark ? 'border-[#1A2744]' : 'border-[#E0E8F5]';
-  const c_inner_bg = isDark ? 'bg-[#070E1B]/60 border-[#1A2744]' : 'bg-[#F4F7FC] border-[#E0E8F5]';
+  const c_bg = isDark ? 'bg-[#1F2329] text-[#E8E9EA]' : 'bg-[#F5F6F7] text-[#1F2329]';
+  const c_sidebar = isDark ? 'dark-glass-sidebar' : 'glass-sidebar';
+  const c_header = isDark ? 'dark-glass-header' : 'glass-header';
+  const c_card = isDark ? 'glass-card dark-glass-card rounded-xl' : 'glass-card rounded-xl';
+  const c_table_hdr = isDark ? 'bg-[#2D3039] text-[#8F959E]' : 'bg-[#F0F1F3] text-[#646A73]';
+  const c_table_row = isDark ? 'hover:bg-[#2D3039]/60' : 'hover:bg-[#F0F1F3]/60';
+  const c_input = isDark ? 'dark-glass-input text-white' : 'glass-input text-[#1F2329]';
+  const c_modal = isDark ? 'dark-glass-modal text-white' : 'glass-modal text-[#1F2329]';
+  const c_text_title = isDark ? 'text-white' : 'text-[#1F2329]';
+  const c_text_sub = isDark ? 'text-[#8F959E]' : 'text-[#646A73]';
+  const c_border = isDark ? 'border-[#373C43]' : 'border-[#DEE0E3]';
+  const c_inner_bg = isDark ? 'bg-[#2D3039] border-[#373C43] rounded-xl' : 'bg-[#F0F1F3] border-[#DEE0E3] rounded-xl';
 
   // Auth headers helper
   const authHeaders = { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' };
@@ -301,22 +303,42 @@ export default function Home() {
     setSidebarOpen(false);
   }, [activeTab]);
 
-  // SSE — real-time notification stream
+  // SSE — real-time notification stream (uses ticket exchange for security)
   useEffect(() => {
     if (!isAuthenticated || !authToken) return;
-    const url = `/api/notifications/stream?token=${encodeURIComponent(authToken)}`;
-    const es = new EventSource(url);
-    es.onmessage = (e) => {
+    let es: EventSource | null = null;
+    let cancelled = false;
+
+    // Exchange JWT → short-lived ticket, then open SSE with ticket
+    (async () => {
       try {
-        const d = JSON.parse(e.data);
-        if (d.type === 'badge') setNotifBadge(d.count);
-        if (d.type === 'notification') {
-          setSseNotifs(prev => [d, ...prev].slice(0, 10));
-          setNotifBadge(c => c + 1);
-        }
+        const ticketRes = await fetch('/api/notifications/ticket', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!ticketRes.ok || cancelled) return;
+        const { ticket } = await ticketRes.json();
+        if (!ticket || cancelled) return;
+
+        const url = `/api/notifications/stream?ticket=${encodeURIComponent(ticket)}`;
+        es = new EventSource(url);
+        es.onmessage = (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            if (d.type === 'badge') setNotifBadge(d.count);
+            if (d.type === 'notification') {
+              setSseNotifs(prev => [d, ...prev].slice(0, 10));
+              setNotifBadge(c => c + 1);
+            }
+          } catch {}
+        };
       } catch {}
+    })();
+
+    return () => {
+      cancelled = true;
+      es?.close();
     };
-    return () => es.close();
   }, [isAuthenticated, authToken]);
 
   // Simulasi MFA Microsoft Authenticator
@@ -612,12 +634,12 @@ export default function Home() {
       <html><head><title>Label QR Aset</title>
       <style>
         body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-        .label { width: 300px; border: 2px solid #1769FF; border-radius: 8px; padding: 16px; text-align: center; }
+        .label { width: 300px; border: 2px solid #3370FF; border-radius: 8px; padding: 16px; text-align: center; }
         .logo { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
         .name { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
         .location { font-size: 10px; color: #888; margin-bottom: 12px; }
         img { width: 200px; height: 200px; }
-        .code { font-size: 11px; font-family: monospace; color: #1769FF; margin-top: 8px; letter-spacing: 1px; }
+        .code { font-size: 11px; font-family: monospace; color: #3370FF; margin-top: 8px; letter-spacing: 1px; }
       </style></head><body>
       <div class="label">
         <div class="logo">🏢 Lintasarta FMSP</div>
@@ -641,177 +663,189 @@ export default function Home() {
   // Login Screen Render (Lintasarta Brand)
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#070E1B] font-sans relative overflow-hidden">
-        {/* Glow Effects - Lintasarta Blue */}
-        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-[#1769FF]/10 blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-[#0D4FCC]/15 blur-[120px] pointer-events-none" />
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(23,105,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(23,105,255,0.3) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+      <div className="flex min-h-screen items-center justify-center bg-[#1F2329] font-sans relative overflow-hidden">
+        {/* Subtle background accent */}
+        <div className="absolute inset-0">
+          <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[#3370FF]/5 blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#3370FF]/3 blur-[120px] pointer-events-none" />
+        </div>
 
-        <div className="w-full max-w-md p-8 bg-[#0F1C33]/80 border border-[#1A2744] backdrop-blur-xl rounded-2xl shadow-2xl relative z-10">
+        <div className="w-full max-w-[420px] p-8 relative z-10 animate-fade-in">
+          {/* Gradient accent strip at top */}
+          <div className="absolute top-0 left-[10%] right-[10%] h-[2px] bg-gradient-to-r from-transparent via-[#3370FF] to-transparent rounded-full" />
+          
+          <div className="dark-glass-modal rounded-xl p-8">
           <div className="flex flex-col items-center mb-8">
-            {/* Lintasarta Logo */}
-            <div className="mb-4">
-              <img src="/lintasarta-icon.png" alt="Lintasarta" className="w-16 h-16 object-contain" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Lintasarta FMSP</h1>
-            <p className="text-sm text-zinc-400 mt-1">Facility Management Service Platform</p>
-          </div>
-
-          {loginStep === 'form' && (
-            <form onSubmit={handleLoginSubmit} className="space-y-6 text-xs">
-              {loginError && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">{loginError}</div>}
-              <div>
-                <label className="block text-zinc-300 font-semibold uppercase tracking-wider mb-2">Corporate Email</label>
-                <div className="relative text-sm">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
-                    <User className="w-4 h-4" />
-                  </span>
-                  <input 
-                    type="email" 
-                    required 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-[#070E1B] border border-[#1A2744] rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#1769FF] transition-colors text-sm"
-                    placeholder="name@lintasarta.co.id" 
-                  />
+              {/* Logo */}
+              <div className="mb-5 relative">
+                <div className="relative w-16 h-16 rounded-xl bg-[#3370FF] flex items-center justify-center p-2.5">
+                  <img src="/lintasarta-icon.png" alt="Lintasarta" className="w-full h-full object-contain brightness-0 invert" />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-zinc-300 font-semibold uppercase tracking-wider mb-2">Password</label>
-                <div className="relative text-sm">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
-                    <Lock className="w-4 h-4" />
-                  </span>
-                  <input 
-                    type="password" 
-                    required 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-[#070E1B] border border-[#1A2744] rounded-xl text-white focus:outline-none focus:border-[#1769FF] transition-colors text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center text-zinc-400">
-                  <input type="checkbox" defaultChecked className="mr-2 rounded border-[#1A2744] bg-[#070E1B] text-[#1769FF] focus:ring-0 focus:ring-offset-0" />
-                  Ingat saya
-                </label>
-                <a href="#" onClick={(e) => { e.preventDefault(); setLoginStep('forgot'); setLoginError(''); }} className="text-[#1769FF] hover:underline">Lupa Password?</a>
-              </div>
-
-              <button 
-                type="submit" 
-                className="w-full py-3 bg-gradient-to-r from-[#1769FF] to-[#0D4FCC] hover:from-[#4A8AFF] hover:to-[#1769FF] text-white rounded-xl font-semibold transition-all shadow-md shadow-[#1769FF]/20 active:scale-[0.98] text-sm"
-              >
-                Sign In with SSO
-              </button>
-            </form>
-          )}
-
-          {loginStep === 'mfa' && (
-            <div className="text-center py-6 space-y-6">
-              <div className="flex justify-center">
-                <div className="relative flex items-center justify-center">
-                  <div className="animate-ping absolute inline-flex h-20 w-20 rounded-full bg-[#1769FF]/10 opacity-75" />
-                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-[#1769FF] flex items-center justify-center animate-spin" style={{ animationDuration: '6s' }} />
-                  <Smartphone className="w-8 h-8 text-[#1769FF] absolute" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-white">2FA Verification Required</h3>
-                <p className="text-sm text-zinc-400 px-4">
-                  Buka aplikasi **Microsoft Authenticator** Anda dan setujui permintaan masuk yang dikirimkan.
-                </p>
-              </div>
-              <div className="text-xs text-zinc-500">
-                Memproses dalam {mfaTimer} detik...
-              </div>
+              <h1 className="text-2xl font-semibold tracking-tight text-white">Lintasarta FMSP</h1>
+              <p className="text-sm text-[#8F959E] mt-1.5">Facility Management Service Platform</p>
             </div>
-          )}
 
-          {loginStep === 'success' && (
-            <div className="text-center py-8 space-y-4">
-              <div className="flex justify-center">
-                <CheckCircle2 className="w-16 h-16 text-emerald-500 animate-bounce" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-white">Akses Disetujui</h3>
-                <p className="text-sm text-zinc-400">Selamat datang kembali di FMSP Lintasarta.</p>
-              </div>
-            </div>
-          )}
-
-          {loginStep === 'forgot' && (
-            <div className="space-y-5">
-              <div className="text-center space-y-2">
-                <div className="flex justify-center">
-                  <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                    <Lock className="w-6 h-6 text-amber-400" />
+            {loginStep === 'form' && (
+              <form onSubmit={handleLoginSubmit} className="space-y-5 text-xs">
+                {loginError && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/15 text-red-400 text-xs animate-fade-in">{loginError}</div>}
+                <div>
+                  <label className="block text-zinc-400 font-semibold uppercase tracking-widest text-[10px] mb-2">Corporate Email</label>
+                  <div className="relative text-sm">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
+                      <User className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="email" 
+                      required 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3.5 dark-glass-input rounded-xl text-white placeholder-zinc-600 text-sm"
+                      placeholder="name@lintasarta.co.id" 
+                    />
                   </div>
                 </div>
-                <h3 className="text-lg font-bold text-white">Lupa Password</h3>
-                <p className="text-xs text-zinc-400 px-4">
-                  Masukkan email Anda. Permintaan reset akan dikirim ke administrator untuk persetujuan.
-                </p>
-              </div>
 
-              {loginError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2 text-xs text-red-400 text-center">
-                  {loginError}
-                </div>
-              )}
-
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setLoginError('');
-                try {
-                  const r = await fetch('/api/auth/forgot-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, reason: 'Lupa password' }),
-                  });
-                  const data = await r.json();
-                  if (data.success) {
-                    setLoginError('');
-                    setLoginStep('form');
-                    alert('✅ Permintaan reset password telah dikirim ke administrator untuk persetujuan. Silakan hubungi admin Anda.');
-                  } else {
-                    setLoginError(data.error);
-                  }
-                } catch { setLoginError('Gagal mengirim permintaan'); }
-              }} className="space-y-4">
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1.5">Email</label>
-                  <input 
-                    type="email" required value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#070E1B] border border-[#1A2744] rounded-xl text-white focus:outline-none focus:border-[#1769FF] transition-colors text-sm"
-                    placeholder="email@lintasarta.co.id"
-                  />
+                  <label className="block text-zinc-400 font-semibold uppercase tracking-widest text-[10px] mb-2">Password</label>
+                  <div className="relative text-sm">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
+                      <Lock className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="password" 
+                      required 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3.5 dark-glass-input rounded-xl text-white text-sm"
+                    />
+                  </div>
                 </div>
-                <button type="submit" className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white rounded-xl font-semibold transition-all text-sm">
-                  Kirim Permintaan Reset
-                </button>
-                <button type="button" onClick={() => { setLoginStep('form'); setLoginError(''); }}
-                  className="w-full py-2 text-sm text-zinc-400 hover:text-white transition-colors">
-                  ← Kembali ke Login
+
+                <div className="flex items-center justify-between text-xs">
+                  <label className="flex items-center text-zinc-400 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="mr-2 rounded border-[#373C43] bg-[#2D3039] text-[#3370FF] focus:ring-0 focus:ring-offset-0" />
+                    Ingat saya
+                  </label>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setLoginStep('forgot'); setLoginError(''); }} className="text-[#5B8EFF] hover:text-[#3370FF] transition-colors">Lupa Password?</a>
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="w-full py-3.5 bg-[#3370FF] hover:bg-[#245BDB] text-white rounded-xl font-semibold transition-colors text-sm"
+                >
+                  Sign In with SSO
                 </button>
               </form>
-            </div>
-          )}
+            )}
 
-          <div className="mt-8 pt-6 border-t border-[#1A2744]/60 text-center">
-            <p className="text-xs text-zinc-500">
-              Dikendalikan oleh Lintasarta Infosec SSO Gateway.
-            </p>
+            {loginStep === 'mfa' && (
+              <div className="text-center py-6 space-y-6 animate-fade-in">
+                <div className="flex justify-center">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute inline-flex h-20 w-20 rounded-full bg-[#3370FF]/10 animate-ping opacity-50" />
+                    <div className="w-20 h-20 rounded-full border-2 border-dashed border-[#3370FF]/40 flex items-center justify-center animate-spin" style={{ animationDuration: '6s' }} />
+                    <Smartphone className="w-8 h-8 text-[#5B8EFF] absolute" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-white">2FA Verification Required</h3>
+                  <p className="text-sm text-zinc-400 px-4 leading-relaxed">
+                    Buka aplikasi **Microsoft Authenticator** Anda dan setujui permintaan masuk yang dikirimkan.
+                  </p>
+                </div>
+                <div className="text-xs text-zinc-500">
+                  Memproses dalam {mfaTimer} detik...
+                </div>
+              </div>
+            )}
+
+            {loginStep === 'success' && (
+              <div className="text-center py-8 space-y-4 animate-fade-scale">
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <div className="absolute inset-0 w-16 h-16 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
+                    <CheckCircle2 className="relative w-16 h-16 text-emerald-400" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">Akses Disetujui</h3>
+                  <p className="text-sm text-zinc-400">Selamat datang kembali di FMSP Lintasarta.</p>
+                </div>
+              </div>
+            )}
+
+            {loginStep === 'forgot' && (
+              <div className="space-y-5 animate-fade-in">
+                <div className="text-center space-y-2">
+                  <div className="flex justify-center">
+                    <div className="w-14 h-14 rounded-xl bg-amber-500/10 border border-amber-500/15 flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-amber-400" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Lupa Password</h3>
+                  <p className="text-xs text-zinc-400 px-4 leading-relaxed">
+                    Masukkan email Anda. Permintaan reset akan dikirim ke administrator untuk persetujuan.
+                  </p>
+                </div>
+
+                {loginError && (
+                  <div className="bg-red-500/10 border border-red-500/15 rounded-xl px-4 py-2 text-xs text-red-400 text-center animate-fade-in">
+                    {loginError}
+                  </div>
+                )}
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  setLoginError('');
+                  try {
+                    const r = await fetch('/api/auth/forgot-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email, reason: 'Lupa password' }),
+                    });
+                    const data = await r.json();
+                    if (data.success) {
+                      setLoginError('');
+                      setLoginStep('form');
+                      alert('✅ Permintaan reset password telah dikirim ke administrator untuk persetujuan. Silakan hubungi admin Anda.');
+                    } else {
+                      setLoginError(data.error);
+                    }
+                  } catch { setLoginError('Gagal mengirim permintaan'); }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-zinc-400 mb-1.5">Email</label>
+                    <input 
+                      type="email" required value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3.5 dark-glass-input rounded-xl text-white text-sm"
+                      placeholder="email@lintasarta.co.id"
+                    />
+                  </div>
+                  <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white rounded-xl font-semibold transition-all text-sm btn-shimmer">
+                    Kirim Permintaan Reset
+                  </button>
+                  <button type="button" onClick={() => { setLoginStep('form'); setLoginError(''); }}
+                    className="w-full py-2 text-sm text-zinc-400 hover:text-white transition-colors">
+                    ← Kembali ke Login
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="mt-8 pt-6 border-t border-[#373C43]/40 text-center">
+              <p className="text-[11px] text-zinc-500">
+                Dikendalikan oleh Lintasarta Infosec SSO Gateway.
+              </p>
+            </div>
           </div>
         </div>
       </div>
     );
   }
+
+
 
   // Filter Aset & Dokumen
   const filteredAssets = assets.filter(asset => {
@@ -838,13 +872,12 @@ export default function Home() {
   return (
     <div className={`flex min-h-screen font-sans relative overflow-hidden transition-colors duration-300 ${c_bg}`}>
       
-      {/* Background Decorative Glow (hanya untuk dark mode) */}
-      {isDark && (
-        <>
-          <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-[#1769FF]/5 blur-[120px] pointer-events-none" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#0D4FCC]/5 blur-[120px] pointer-events-none" />
-        </>
-      )}
+      {/* Background Decorative Glow */}
+      <div className="pointer-events-none">
+        <div className={`absolute top-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full blur-[140px] transition-opacity duration-500 ${isDark ? 'bg-[#3370FF]/6 opacity-100' : 'bg-[#3370FF]/4 opacity-60'}`} />
+        <div className={`absolute bottom-[-15%] left-[-10%] w-[45%] h-[45%] rounded-full blur-[140px] transition-opacity duration-500 ${isDark ? 'bg-[#3370FF]/5 opacity-100' : 'bg-[#3370FF]/3 opacity-60'}`} />
+        {isDark && <div className="absolute top-[40%] left-[30%] w-[20%] h-[20%] rounded-full bg-[#3370FF]/3 blur-[100px]" />}
+      </div>
 
       {/* ── Mobile Drawer Overlay ────────────────── */}
       {sidebarOpen && (
@@ -864,186 +897,185 @@ export default function Home() {
         ${c_sidebar}
       `}>
         <div className="flex-1 overflow-y-auto">
-          {/* Header Sidebar — Lintasarta Logo */}
-          <div className={`h-20 border-b flex items-center px-5 gap-3 ${c_border}`}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1769FF] to-[#0D4FCC] flex items-center justify-center shadow-md shadow-[#1769FF]/20 p-1.5">
-              <img src="/lintasarta-icon.png" alt="Lintasarta" className="w-full h-full object-contain brightness-0 invert" />
+          {/* Header Sidebar — Lintasarta Logo + gradient accent */}
+          <div className={`h-20 border-b flex items-center px-5 gap-3 relative ${c_border}`}>
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#3370FF] rounded-t-none" />
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-xl bg-[#3370FF]/20 blur-md" />
+              <div className="relative w-10 h-10 rounded-xl bg-[#3370FF] flex items-center justify-center shadow-lg shadow-[#3370FF]/25 p-1.5">
+                <img src="/lintasarta-icon.png" alt="Lintasarta" className="w-full h-full object-contain brightness-0 invert" />
+              </div>
             </div>
             <div>
               <h2 className={`font-bold tracking-tight text-sm ${c_text_title}`}>FMSP Lintasarta</h2>
-              <span className="text-[10px] text-[#1769FF] font-semibold tracking-wider uppercase">Facility Management</span>
+              <span className="text-[10px] font-semibold tracking-widest uppercase gradient-text">Facility Management</span>
             </div>
           </div>
 
           {/* Navigasi Sidebar */}
-          <nav className="p-4 space-y-1">
-            <button 
-              onClick={() => setActiveTab('overview')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <Database className="w-4 h-4" />
-              Overview
-            </button>
-            <button 
-              onClick={() => setActiveTab('assets')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'assets' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <Building2 className="w-4 h-4" />
-              Aset & Perizinan
-            </button>
-            <button 
-              onClick={() => setActiveTab('notifications')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all relative ${activeTab === 'notifications' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <Bell className="w-4 h-4" />
-              Reminder & Alerts
-              {notifications.filter(n => n.status === 'pending').length > 0 && (
-                <span className="absolute right-4 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              )}
-            </button>
+          <nav className="p-3 space-y-0.5">
+            {/* helper for nav items */}
+            {([
+              { tab: 'overview', icon: <Database className="w-4 h-4" />, label: 'Overview', size: 'lg' },
+              { tab: 'assets', icon: <Building2 className="w-4 h-4" />, label: 'Aset & Perizinan', size: 'lg' },
+              { tab: 'notifications', icon: <Bell className="w-4 h-4" />, label: 'Reminder & Alerts', size: 'lg', badge: notifications.filter(n => n.status === 'pending').length > 0 },
+            ] as { tab: string; icon: React.ReactNode; label: string; size: string; badge?: boolean }[]).map(({ tab, icon, label, badge }) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 relative ${
+                  activeTab === tab
+                    ? 'menu-active text-white'
+                    : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}
+              >
+                {icon}
+                {label}
+                {badge && <span className="absolute right-4 w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+              </button>
+            ))}
 
-            {/* Header Management */}
-            <div className="pt-4 pb-2 px-4">
-              <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Management</span>
+            {/* ── Section: Management ── */}
+            <div className="pt-4 pb-1.5 px-3">
+              <div className={`flex items-center gap-2`}>
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Management</span>
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+              </div>
             </div>
 
-            <button 
-              onClick={() => setActiveTab('inventory')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'inventory' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <Box className="w-4 h-4" />
-              Inventory
-            </button>
-            <button 
-              onClick={() => setActiveTab('smk3')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'smk3' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <HeartPulse className="w-4 h-4" />
-              SMK3 Safety
-            </button>
+            {([
+              { tab: 'inventory', icon: <Box className="w-4 h-4" />, label: 'Inventory' },
+              { tab: 'smk3', icon: <HeartPulse className="w-4 h-4" />, label: 'SMK3 Safety' },
+            ] as { tab: string; icon: React.ReactNode; label: string }[]).map(({ tab, icon, label }) => (
+              <button key={tab} onClick={() => setActiveTab(tab as any)}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  activeTab === tab ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}>
+                {icon}{label}
+              </button>
+            ))}
 
-            {/* Header Operations */}
-            <div className="pt-4 pb-2 px-4">
-              <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Operations</span>
+            {/* ── Section: Operations ── */}
+            <div className="pt-4 pb-1.5 px-3">
+              <div className="flex items-center gap-2">
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Operations</span>
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+              </div>
             </div>
-            <button 
-              onClick={() => setActiveTab('maintenance')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'maintenance' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <Wrench className="w-4 h-4" />
-              Preventive Maintenance
-            </button>
-            <button 
-              onClick={() => setActiveTab('vendor')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'vendor' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <FileSignature className="w-4 h-4" />
-              Vendor & Contract
-            </button>
+            {([
+              { tab: 'maintenance', icon: <Wrench className="w-4 h-4" />, label: 'Preventive Maintenance' },
+              { tab: 'vendor', icon: <FileSignature className="w-4 h-4" />, label: 'Vendor & Contract' },
+            ] as { tab: string; icon: React.ReactNode; label: string }[]).map(({ tab, icon, label }) => (
+              <button key={tab} onClick={() => setActiveTab(tab as any)}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  activeTab === tab ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}>
+                {icon}{label}
+              </button>
+            ))}
 
             {/* ── Phase 2 Advance Menu (Admin+Manager+SuperAdmin only) ── */}
             {currentUser && ['superadmin', 'manager_fms', 'admin_pusat'].includes(currentUser.role) && (
               <>
-                <div className="pt-4 pb-2 px-4">
-                  <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Phase 2</span>
+                <div className="pt-4 pb-1.5 px-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                    <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Phase 2</span>
+                    <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                  </div>
                 </div>
                 <button
                   onClick={() => setPhase2Open(!phase2Open)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    ['hrd', 'accounting', 'workorder'].includes(activeTab)
-                      ? 'bg-[#1769FF]/10 text-[#4A8AFF] border border-[#1769FF]/20'
-                      : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                    ['hrd', 'accounting', 'workorder', 'aiconfig'].includes(activeTab)
+                      ? 'bg-[#3370FF]/10 text-[#5B8EFF] border border-[#3370FF]/20'
+                      : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
                   }`}
                 >
                   <span className="flex items-center gap-3">
                     <Shield className="w-4 h-4" />
-                    Phase 2 Advance Menu
+                    Phase 2 Advance
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${phase2Open ? 'rotate-180' : ''}`} />
                 </button>
                 {phase2Open && (
-                  <div className="ml-4 pl-3 border-l-2 border-[#1769FF]/20 space-y-0.5 mt-0.5">
-                    <button 
-                      onClick={() => setActiveTab('hrd')}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'hrd' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      HRD & Security
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('accounting')}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'accounting' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-                    >
-                      <DollarSign className="w-3.5 h-3.5" />
-                      Keuangan
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('workorder')}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'workorder' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-                    >
-                      <ClipboardList className="w-3.5 h-3.5" />
-                      Work Order / Ticket
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('aiconfig')}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'aiconfig' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-                    >
-                      <Bot className="w-3.5 h-3.5" />
-                      AI Configuration
-                    </button>
+                  <div className={`ml-3 pl-3 border-l-2 border-[#3370FF]/20 space-y-0.5 mt-1 animate-fade-in`}>
+                    {([
+                      { tab: 'hrd', icon: <Users className="w-3.5 h-3.5" />, label: 'HRD & Security' },
+                      { tab: 'accounting', icon: <DollarSign className="w-3.5 h-3.5" />, label: 'Keuangan' },
+                      { tab: 'workorder', icon: <ClipboardList className="w-3.5 h-3.5" />, label: 'Work Order / Ticket' },
+                      { tab: 'aiconfig', icon: <Bot className="w-3.5 h-3.5" />, label: 'AI Configuration' },
+                    ] as { tab: string; icon: React.ReactNode; label: string }[]).map(({ tab, icon, label }) => (
+                      <button key={tab} onClick={() => setActiveTab(tab as any)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all duration-200 ${
+                          activeTab === tab ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                        }`}>
+                        {icon}{label}
+                      </button>
+                    ))}
                   </div>
                 )}
               </>
             )}
 
-            {/* Header Analytics */}
-            <div className="pt-4 pb-2 px-4">
-              <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Analytics</span>
+            {/* ── Section: Analytics ── */}
+            <div className="pt-4 pb-1.5 px-3">
+              <div className="flex items-center gap-2">
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Analytics</span>
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+              </div>
             </div>
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'analytics' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            <button onClick={() => setActiveTab('analytics')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                activeTab === 'analytics' ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+              }`}>
+              <TrendingUp className="w-4 h-4" />
               Analytics & Charts
             </button>
 
-            {/* Header Integration */}
-            <div className="pt-4 pb-2 px-4">
-              <span className="text-[10px] text-zinc-500 font-bold tracking-wider uppercase">Integration</span>
+            {/* ── Section: Integration ── */}
+            <div className="pt-4 pb-1.5 px-3">
+              <div className="flex items-center gap-2">
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+                <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400">Integration</span>
+                <div className={`h-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
+              </div>
             </div>
             {currentUser && hasPermission(currentUser.role, 'audit_log_view') && (
-              <button 
-                onClick={() => setActiveTab('auditlog')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'auditlog' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-              >
+              <button onClick={() => setActiveTab('auditlog')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  activeTab === 'auditlog' ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}>
                 <ScrollText className="w-4 h-4" />
                 Audit Log
               </button>
             )}
             {currentUser && hasPermission(currentUser.role, 'user_manage') && (
-              <button 
-                onClick={() => setActiveTab('users')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'users' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+              <button onClick={() => setActiveTab('users')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  activeTab === 'users' ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}>
+                <Users className="w-4 h-4" />
                 Manajemen User
               </button>
             )}
             {currentUser && hasPermission(currentUser.role, 'master_data') && (
-              <button 
-                onClick={() => setActiveTab('admin')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'admin' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-              >
+              <button onClick={() => setActiveTab('admin')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  activeTab === 'admin' ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}>
                 <Settings className="w-4 h-4" />
                 Admin Master Data
               </button>
             )}
             {currentUser && ['superadmin', 'manager_fms', 'admin_pusat', 'admin_regional', 'admin_lokasi'].includes(currentUser.role) && (
-              <button 
-                onClick={() => setActiveTab('docs')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'docs' ? 'bg-[#1769FF] text-white shadow-lg shadow-[#1769FF]/15' : `text-zinc-400 hover:${c_text_title} hover:bg-zinc-500/10`}`}
-              >
+              <button onClick={() => setActiveTab('docs')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  activeTab === 'docs' ? 'menu-active text-white' : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
+                }`}>
                 <BookOpen className="w-4 h-4" />
                 Dokumen & Manual
               </button>
@@ -1053,36 +1085,32 @@ export default function Home() {
 
         {/* User Info & Logout */}
         <div className={`p-4 border-t ${c_border}`}>
-          <div className={`flex items-center justify-between p-2 rounded-xl border ${c_inner_bg}`}>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#0D4FCC]/50 border border-[#1769FF]/20 flex items-center justify-center">
-                <User className="w-4 h-4 text-[#4A8AFF]" />
+          <div className={`flex items-center justify-between p-2.5 rounded-xl border ${c_inner_bg}`}>
+            <div className="flex items-center gap-2.5">
+              {/* Avatar with gradient ring */}
+              <div className="relative shrink-0">
+                <div className="absolute inset-[-2px] rounded-full bg-[#3370FF] opacity-50" />
+                <div className={`relative w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-[#2D3039]' : 'bg-white'}`}>
+                  <User className="w-4 h-4 text-[#5B8EFF]" />
+                </div>
               </div>
               <div className="overflow-hidden">
                 <h4 className={`text-xs font-bold truncate w-28 ${c_text_title}`}>{currentUser?.name || 'Admin FM'}</h4>
                 <p className="text-[10px] text-zinc-500 truncate w-28">{currentUser?.email || 'admin@lintasarta.co.id'}</p>
                 {currentUser && (
-                  <span 
+                  <span
                     className="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ 
-                      color: getRoleConfig(currentUser.role).color, 
-                      backgroundColor: getRoleConfig(currentUser.role).bgColor 
-                    }}
+                    style={{ color: getRoleConfig(currentUser.role).color, backgroundColor: getRoleConfig(currentUser.role).bgColor }}
                   >
                     {currentUser.roleLabel || getRoleConfig(currentUser.role).label}
                   </span>
                 )}
               </div>
             </div>
-            <button 
-              onClick={() => {
-                setIsAuthenticated(false);
-                setAuthToken('');
-                setCurrentUser(null);
-                setLoginStep('form');
-              }}
+            <button
+              onClick={() => { setIsAuthenticated(false); setAuthToken(''); setCurrentUser(null); setLoginStep('form'); }}
               title="Logout"
-              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -1094,19 +1122,21 @@ export default function Home() {
       <main className="flex-1 flex flex-col min-h-screen overflow-y-auto mobile-content-pad">
         
         {/* Header Bar */}
-        <header className={`h-16 md:h-20 border-b px-4 md:px-8 flex items-center justify-between backdrop-blur-md sticky top-0 z-30 transition-colors duration-300 ${c_header}`}>
+        <header className={`h-16 md:h-20 border-b px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300 ${c_header}`}>
+          {/* gradient accent bottom border */}
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#3370FF]/30 to-transparent" />
           {/* Mobile: Hamburger + Title */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className={`md:hidden p-2 rounded-xl border transition-all ${isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'}`}
+              className={`md:hidden p-2 rounded-xl border transition-all ${isDark ? 'bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10' : 'bg-white border-zinc-200/80 text-zinc-600 shadow-sm hover:bg-zinc-50'}`}
               aria-label="Buka menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-          <h1 className={`text-base md:text-xl font-bold tracking-tight capitalize ${c_text_title}`}>
+          <h1 className={`text-base md:text-xl font-bold tracking-tight ${c_text_title}`}>
             {activeTab === 'overview' && 'Dashboard — Ringkasan Portofolio Aset'}
             {activeTab === 'assets' && 'Manajemen Aset & Perizinan'}
             {activeTab === 'notifications' && 'Kotak Alerts & Reminder'}
@@ -1146,11 +1176,11 @@ export default function Home() {
 
               {/* Notification Dropdown */}
               {showNotifDropdown && (
-                <div className={`absolute right-0 top-11 w-80 rounded-2xl border shadow-2xl z-50 overflow-hidden ${isDark ? 'bg-[#0F1C33] border-[#1A2744]' : 'bg-white border-[#E0E8F5]'}`}>
-                  <div className={`px-4 py-3 border-b flex items-center justify-between ${isDark ? 'border-[#1A2744]' : 'border-[#E0E8F5]'}`}>
+                <div className={`absolute right-0 top-11 w-80 rounded-xl border shadow-2xl z-50 overflow-hidden ${isDark ? 'bg-[#0F1C33] border-[#373C43]' : 'bg-white border-[#DEE0E3]'}`}>
+                  <div className={`px-4 py-3 border-b flex items-center justify-between ${isDark ? 'border-[#373C43]' : 'border-[#DEE0E3]'}`}>
                     <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-zinc-800'}`}>Notifikasi Terbaru</span>
                     <button onClick={() => { setShowNotifDropdown(false); setActiveTab('notifications'); }}
-                      className="text-[10px] text-[#1769FF] font-semibold">Lihat Semua</button>
+                      className="text-[10px] text-[#3370FF] font-semibold">Lihat Semua</button>
                   </div>
                   <div className="max-h-64 overflow-y-auto divide-y" style={{ borderColor: isDark ? '#1A2744' : '#E0E8F5' }}>
                     {sseNotifs.length === 0 ? (
@@ -1182,7 +1212,7 @@ export default function Home() {
               <button 
                 onClick={runReminderCron}
                 disabled={cronLoading}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#1769FF] to-[#0D4FCC] hover:from-[#4A8AFF] hover:to-[#1769FF] disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-[#3370FF] hover:bg-[#245BDB] disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${cronLoading ? 'animate-spin' : ''}`} />
                 {cronLoading ? 'Evaluasi...' : 'Simulasi Cron'}
@@ -1199,7 +1229,7 @@ export default function Home() {
         {/* Loading Spinner */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
-            <RefreshCw className="w-8 h-8 text-[#1769FF] animate-spin" />
+            <RefreshCw className="w-8 h-8 text-[#3370FF] animate-spin" />
           </div>
         ) : (
           <div className="p-8 flex-1 space-y-8 max-w-7xl w-full mx-auto">
@@ -1259,12 +1289,14 @@ export default function Home() {
                       ROW 1 — HEADLINE STORY (The "So What?")
                       SWD Principle: Lead with the most important insight
                   ═══════════════════════════════════════════════════ */}
-                  <div className={`rounded-2xl border p-6 ${c_card}`}>
-                    <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                  <div className={`rounded-xl border p-6 relative overflow-hidden gradient-accent-top animate-fade-in ${c_card}`}>
+                    {/* subtle mesh gradient overlay */}
+                    <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-gradient-to-br from-[#3370FF]/3 to-transparent' : 'bg-gradient-to-br from-[#3370FF]/2 to-transparent'}`} />
+                    <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                       <div>
-                        <p className={`text-xs tracking-wider uppercase font-semibold ${c_text_sub}`}>Ringkasan Portofolio</p>
+                        <p className={`text-xs tracking-widest uppercase font-bold ${c_text_sub}`}>Ringkasan Portofolio</p>
                         <h2 className={`text-2xl font-bold mt-1 ${c_text_title}`}>
-                          {totalAssetsCount} Aset Terkelola — Nilai Total {formatShortRupiah(totalValue)}
+                          <span className="gradient-text">{totalAssetsCount} Aset</span> Terkelola — Nilai Total {formatShortRupiah(totalValue)}
                         </h2>
                         <p className={`text-sm mt-2 leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                           {brokenAssets > 0
@@ -1283,13 +1315,13 @@ export default function Home() {
                       </div>
                       <div className="flex flex-col sm:flex-row gap-6 shrink-0 items-center">
                         <div className="text-center">
-                          <p className={`text-3xl font-bold ${complianceRate >= 90 ? 'text-emerald-600' : complianceRate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>{complianceRate}%</p>
-                          <p className={`text-[10px] font-semibold uppercase tracking-wider mt-1 ${c_text_sub}`}>Kepatuhan Legal</p>
+                          <p className={`text-3xl font-bold tabular-nums ${complianceRate >= 90 ? 'text-emerald-600' : complianceRate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>{complianceRate}%</p>
+                          <p className={`text-[10px] font-semibold uppercase tracking-widest mt-1 ${c_text_sub}`}>Kepatuhan Legal</p>
                         </div>
                         <div className={`w-px hidden sm:block ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
                         <div className="text-center">
-                          <p className={`text-3xl font-bold ${pendingNotifications > 0 ? 'text-amber-500' : `${c_text_title}`}`}>{pendingNotifications}</p>
-                          <p className={`text-[10px] font-semibold uppercase tracking-wider mt-1 ${c_text_sub}`}>Alert Pending</p>
+                          <p className={`text-3xl font-bold tabular-nums ${pendingNotifications > 0 ? 'text-amber-500' : `${c_text_title}`}`}>{pendingNotifications}</p>
+                          <p className={`text-[10px] font-semibold uppercase tracking-widest mt-1 ${c_text_sub}`}>Alert Pending</p>
                         </div>
                         <div className={`w-px hidden sm:block ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
                         {/* PDF Report Download */}
@@ -1306,10 +1338,10 @@ export default function Home() {
                                 win.document.close();
                               });
                           }}
-                          className="flex flex-col items-center gap-1 px-4 py-2.5 bg-[#1769FF]/10 hover:bg-[#1769FF]/20 border border-[#1769FF]/30 text-[#1769FF] rounded-xl transition-all text-xs font-semibold"
+                          className="flex flex-col items-center gap-1 px-4 py-3 bg-gradient-to-br from-[#3370FF]/10 to-[#3370FF]/5 hover:from-[#3370FF]/20 hover:to-[#3370FF]/10 border border-[#3370FF]/25 hover:border-[#3370FF]/40 text-[#3370FF] rounded-xl transition-all text-xs font-semibold btn-shimmer"
                           title="Download Laporan Compliance Bulanan"
                         >
-                          <span className="text-lg">📄</span>
+                          <FileText className="w-5 h-5" />
                           <span>Laporan PDF</span>
                         </button>
                       </div>
@@ -1322,19 +1354,22 @@ export default function Home() {
                   ═══════════════════════════════════════════════════ */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: 'Kondisi Baik', value: goodAssets, color: 'text-emerald-600', bar: 'bg-emerald-500', pct: totalAssetsCount ? (goodAssets / totalAssetsCount) * 100 : 0 },
-                      { label: 'Perlu Perhatian', value: warningAssets, color: warningAssets > 0 ? 'text-amber-500' : `${c_text_title}`, bar: 'bg-amber-400', pct: totalAssetsCount ? (warningAssets / totalAssetsCount) * 100 : 0 },
-                      { label: 'Rusak', value: brokenAssets, color: brokenAssets > 0 ? 'text-red-500' : `${c_text_title}`, bar: 'bg-red-500', pct: totalAssetsCount ? (brokenAssets / totalAssetsCount) * 100 : 0 },
-                      { label: 'Dokumen Valid', value: validDocs, color: 'text-emerald-600', bar: 'bg-emerald-500', pct: legalDocs.length ? (validDocs / legalDocs.length) * 100 : 0 },
+                      { label: 'Kondisi Baik', value: goodAssets, icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, kpiClass: 'kpi-good', textColor: 'text-emerald-600', bar: 'bg-gradient-to-r from-emerald-500 to-emerald-400', pct: totalAssetsCount ? (goodAssets / totalAssetsCount) * 100 : 0, sub: `${Math.round(totalAssetsCount ? (goodAssets/totalAssetsCount)*100 : 0)}% dari total aset` },
+                      { label: 'Perlu Perhatian', value: warningAssets, icon: <AlertTriangle className="w-5 h-5 text-amber-500" />, kpiClass: warningAssets > 0 ? 'kpi-warn' : '', textColor: warningAssets > 0 ? 'text-amber-500' : c_text_title, bar: 'bg-gradient-to-r from-amber-400 to-amber-300', pct: totalAssetsCount ? (warningAssets / totalAssetsCount) * 100 : 0, sub: `${Math.round(totalAssetsCount ? (warningAssets/totalAssetsCount)*100 : 0)}% dari total aset` },
+                      { label: 'Rusak / Kritis', value: brokenAssets, icon: <AlertTriangle className="w-5 h-5 text-red-500" />, kpiClass: brokenAssets > 0 ? 'kpi-danger' : '', textColor: brokenAssets > 0 ? 'text-red-500' : c_text_title, bar: 'bg-gradient-to-r from-red-500 to-red-400', pct: totalAssetsCount ? (brokenAssets / totalAssetsCount) * 100 : 0, sub: `${Math.round(totalAssetsCount ? (brokenAssets/totalAssetsCount)*100 : 0)}% dari total aset` },
+                      { label: 'Dokumen Valid', value: validDocs, icon: <ShieldCheck className="w-5 h-5 text-[#3370FF]" />, kpiClass: 'kpi-info', textColor: 'text-[#3370FF]', bar: 'bg-[#3370FF]', pct: legalDocs.length ? (validDocs / legalDocs.length) * 100 : 0, sub: `${Math.round(legalDocs.length ? (validDocs/legalDocs.length)*100 : 0)}% compliance rate` },
                     ].map((kpi, i) => (
-                      <div key={i} className={`rounded-xl border p-5 ${c_card}`}>
-                        <p className={`text-[11px] font-semibold uppercase tracking-wide ${c_text_sub}`}>{kpi.label}</p>
-                        <p className={`text-3xl font-bold mt-1.5 ${kpi.color}`}>{kpi.value}</p>
-                        {/* SWD: Micro progress bar shows proportion without needing a pie chart */}
-                        <div className={`h-1 rounded-full mt-3 ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
-                          <div className={`h-1 rounded-full transition-all duration-700 ${kpi.bar}`} style={{ width: `${Math.max(kpi.pct, 2)}%` }} />
+                      <div key={i} className={`rounded-xl border p-5 transition-all duration-200 animate-fade-in stagger-${i+1} ${c_card} ${kpi.kpiClass}`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <p className={`text-[11px] font-bold uppercase tracking-widest ${c_text_sub}`}>{kpi.label}</p>
+                          <div className={`p-1.5 rounded-lg ${isDark ? 'bg-white/5' : 'bg-white/80'}`}>{kpi.icon}</div>
                         </div>
-                        <p className={`text-[10px] mt-1.5 ${c_text_sub}`}>{Math.round(kpi.pct)}% dari total</p>
+                        <p className={`text-3xl font-bold tabular-nums ${kpi.textColor}`}>{kpi.value}</p>
+                        {/* Gradient progress bar */}
+                        <div className={`h-1.5 rounded-full mt-3 ${isDark ? 'bg-zinc-800/80' : 'bg-zinc-100'}`}>
+                          <div className={`h-1.5 rounded-full transition-all duration-700 ${kpi.bar}`} style={{ width: `${Math.max(kpi.pct, 2)}%` }} />
+                        </div>
+                        <p className={`text-[10px] mt-1.5 font-medium ${c_text_sub}`}>{kpi.sub}</p>
                       </div>
                     ))}
                   </div>
@@ -1347,19 +1382,19 @@ export default function Home() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     
                     {/* Chart A: Distribusi Aset per Tipe */}
-                    <div className={`rounded-xl border p-6 ${c_card}`}>
+                    <div className={`rounded-xl border p-6 animate-fade-in stagger-1 ${c_card}`}>
                       <p className={`text-xs font-bold ${c_text_title}`}>Komposisi aset didominasi oleh {typeSorted[0]?.[0] || '—'}</p>
                       <p className={`text-[11px] mt-0.5 ${c_text_sub}`}>Jumlah aset per kategori tipe</p>
                       <div className="mt-5 space-y-3">
                         {typeSorted.map(([type, count], i) => (
                           <div key={type}>
-                            <div className="flex items-center justify-between text-xs mb-1">
+                            <div className="flex items-center justify-between text-xs mb-1.5">
                               <span className={`font-medium ${c_text_title}`}>{type}</span>
-                              <span className={`font-bold tabular-nums ${i === 0 ? 'text-[#1769FF]' : c_text_sub}`}>{count}</span>
+                              <span className={`font-bold tabular-nums ${i === 0 ? 'text-[#3370FF]' : c_text_sub}`}>{count}</span>
                             </div>
-                            <div className={`h-2 rounded-full ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
+                            <div className={`h-2 rounded-full ${isDark ? 'bg-zinc-800/80' : 'bg-zinc-100'}`}>
                               <div
-                                className={`h-2 rounded-full transition-all duration-700 ${i === 0 ? 'bg-[#1769FF]' : isDark ? 'bg-zinc-600' : 'bg-zinc-300'}`}
+                                className={`h-2 rounded-full transition-all duration-700 ${i === 0 ? 'bg-[#3370FF]' : isDark ? 'bg-zinc-600' : 'bg-zinc-300'}`}
                                 style={{ width: `${(count / maxTypeCount) * 100}%` }}
                               />
                             </div>
@@ -1378,11 +1413,11 @@ export default function Home() {
                           <div key={loc}>
                             <div className="flex items-center justify-between text-xs mb-1">
                               <span className={`font-medium truncate max-w-[160px] ${c_text_title}`} title={loc}>{loc}</span>
-                              <span className={`font-bold tabular-nums ${i === 0 ? 'text-[#1769FF]' : c_text_sub}`}>{count}</span>
+                              <span className={`font-bold tabular-nums ${i === 0 ? 'text-[#3370FF]' : c_text_sub}`}>{count}</span>
                             </div>
                             <div className={`h-2 rounded-full ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                               <div
-                                className={`h-2 rounded-full transition-all duration-700 ${i === 0 ? 'bg-[#1769FF]' : isDark ? 'bg-zinc-600' : 'bg-zinc-300'}`}
+                                className={`h-2 rounded-full transition-all duration-700 ${i === 0 ? 'bg-[#3370FF]' : isDark ? 'bg-zinc-600' : 'bg-zinc-300'}`}
                                 style={{ width: `${(count / maxLocationCount) * 100}%` }}
                               />
                             </div>
@@ -1401,11 +1436,11 @@ export default function Home() {
                           <div key={type}>
                             <div className="flex items-center justify-between text-xs mb-1">
                               <span className={`font-medium ${c_text_title}`}>{type}</span>
-                              <span className={`font-bold tabular-nums ${i === 0 ? 'text-[#1769FF]' : c_text_sub}`}>{formatShortRupiah(val)}</span>
+                              <span className={`font-bold tabular-nums ${i === 0 ? 'text-[#3370FF]' : c_text_sub}`}>{formatShortRupiah(val)}</span>
                             </div>
                             <div className={`h-2 rounded-full ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
                               <div
-                                className={`h-2 rounded-full transition-all duration-700 ${i === 0 ? 'bg-[#1769FF]' : isDark ? 'bg-zinc-600' : 'bg-zinc-300'}`}
+                                className={`h-2 rounded-full transition-all duration-700 ${i === 0 ? 'bg-[#3370FF]' : isDark ? 'bg-zinc-600' : 'bg-zinc-300'}`}
                                 style={{ width: `${(val / maxValue) * 100}%` }}
                               />
                             </div>
@@ -1432,7 +1467,7 @@ export default function Home() {
                         <p className={`text-[11px] mt-0.5 ${c_text_sub}`}>Diurutkan berdasarkan urgensi tanggal jatuh tempo</p>
                       </div>
                       {urgentDocs.length > 0 && (
-                        <button onClick={() => { setActiveTab('assets'); setAssetSubTab('legal'); }} className="text-xs text-[#1769FF] hover:underline font-semibold flex items-center gap-1">
+                        <button onClick={() => { setActiveTab('assets'); setAssetSubTab('legal'); }} className="text-xs text-[#3370FF] hover:underline font-semibold flex items-center gap-1">
                           Kelola Dokumen <ChevronRight className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -1442,7 +1477,7 @@ export default function Home() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className={isDark ? 'bg-zinc-950/30 text-zinc-500' : 'bg-zinc-50 text-zinc-500'}>
+                            <tr className={isDark ? 'bg-[#1B1F26]/30 text-zinc-500' : 'bg-zinc-50 text-zinc-500'}>
                               <th className="text-left font-semibold px-5 py-2.5">Dokumen</th>
                               <th className="text-left font-semibold px-5 py-2.5">Aset Terkait</th>
                               <th className="text-left font-semibold px-5 py-2.5">Jatuh Tempo</th>
@@ -1547,7 +1582,7 @@ export default function Home() {
                           <p className={`text-[11px] mt-0.5 ${c_text_sub}`}>Catatan perubahan data terakhir di sistem</p>
                         </div>
                         {currentUser && hasPermission(currentUser.role, 'audit_log_view') && (
-                          <button onClick={() => setActiveTab('auditlog')} className="text-[11px] text-[#1769FF] hover:underline font-semibold">Audit Log →</button>
+                          <button onClick={() => setActiveTab('auditlog')} className="text-[11px] text-[#3370FF] hover:underline font-semibold">Audit Log →</button>
                         )}
                       </div>
 
@@ -1571,7 +1606,7 @@ export default function Home() {
                           <div key={i} className="flex gap-3 group">
                             {/* Timeline line */}
                             <div className="flex flex-col items-center">
-                              <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${i === 0 ? 'bg-[#1769FF]' : isDark ? 'bg-zinc-700' : 'bg-zinc-300'}`} />
+                              <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${i === 0 ? 'bg-[#3370FF]' : isDark ? 'bg-zinc-700' : 'bg-zinc-300'}`} />
                               {i < arr.length - 1 && <div className={`w-px flex-1 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />}
                             </div>
                             <div className="pb-4">
@@ -1598,10 +1633,10 @@ export default function Home() {
             <div className="space-y-6">
               {/* Sub-tab switcher: Aset | Legal */}
               <div className={`flex gap-1 p-1 rounded-xl border w-fit ${c_inner_bg}`}>
-                <button onClick={() => setAssetSubTab('aset')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${assetSubTab === 'aset' ? 'bg-[#1769FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
+                <button onClick={() => setAssetSubTab('aset')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${assetSubTab === 'aset' ? 'bg-[#3370FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
                   <span className="flex items-center gap-2"><Building2 className="w-3.5 h-3.5" /> Data Aset</span>
                 </button>
-                <button onClick={() => setAssetSubTab('legal')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${assetSubTab === 'legal' ? 'bg-[#1769FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
+                <button onClick={() => setAssetSubTab('legal')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${assetSubTab === 'legal' ? 'bg-[#3370FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
                   <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5" /> Perizinan & Legal</span>
                 </button>
               </div>
@@ -1609,7 +1644,7 @@ export default function Home() {
               {assetSubTab === 'aset' && (
               <div className="space-y-6">
                 {/* Search & Actions Bar */}
-                <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-2xl ${c_sidebar}`}>
+                <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-xl ${c_sidebar}`}>
                   <div className="relative w-full sm:max-w-xs">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
                       <Search className="w-4 h-4" />
@@ -1638,7 +1673,7 @@ export default function Home() {
 
                     <button 
                       onClick={() => setShowAssetModal(true)}
-                      className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold shadow-md shadow-[#1769FF]/15"
+                      className="flex items-center gap-1.5 px-4 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold shadow-md shadow-[#3370FF]/15"
                     >
                       <Plus className="w-4 h-4" />
                       Tambah Aset
@@ -1649,7 +1684,7 @@ export default function Home() {
                 {/* Grid List Aset */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredAssets.map(asset => (
-                    <div key={asset.id} className={`border rounded-2xl p-6 flex flex-col justify-between hover:border-[#1769FF]/40 transition-all ${c_card}`}>
+                    <div key={asset.id} className={`border rounded-xl p-6 flex flex-col justify-between hover:border-[#3370FF]/40 transition-all ${c_card}`}>
                       <div className="space-y-4">
                         <div className="flex items-start justify-between">
                           <div>
@@ -1695,7 +1730,7 @@ export default function Home() {
                             setSelectedAsset(asset);
                             setShowDetailModal(true);
                           }}
-                          className="flex-1 py-2 bg-[#1769FF] hover:bg-[#4A8AFF] text-white border border-[#1769FF] rounded-lg text-xs font-semibold transition-colors"
+                          className="flex-1 py-2 bg-[#3370FF] hover:bg-[#5B8EFF] text-white border border-[#3370FF] rounded-lg text-xs font-semibold transition-colors"
                         >
                           Lihat Detail
                         </button>
@@ -1726,7 +1761,7 @@ export default function Home() {
             {assetSubTab === 'legal' && (
               <div className="space-y-6">
                 {/* Search & Actions Bar */}
-                <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-2xl ${c_sidebar}`}>
+                <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-xl ${c_sidebar}`}>
                   <div className="relative w-full sm:max-w-xs">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
                       <Search className="w-4 h-4" />
@@ -1758,7 +1793,7 @@ export default function Home() {
                         setNewDoc({ ...newDoc, assetId: assets[0].id });
                         setShowDocModal(true);
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold shadow-md shadow-[#1769FF]/15"
+                      className="flex items-center gap-1.5 px-4 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold shadow-md shadow-[#3370FF]/15"
                     >
                       <Plus className="w-4 h-4" />
                       Tambah Dokumen
@@ -1767,7 +1802,7 @@ export default function Home() {
                 </div>
 
                 {/* Table Legal Documents */}
-                <div className={`border rounded-2xl overflow-hidden ${c_sidebar}`}>
+                <div className={`border rounded-xl overflow-hidden ${c_sidebar}`}>
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className={`border-b text-[10px] uppercase font-bold tracking-wider ${c_table_hdr}`}>
@@ -1783,7 +1818,15 @@ export default function Home() {
                     <tbody className={`divide-y text-xs ${isDark ? 'divide-zinc-800/60' : 'divide-zinc-200'}`}>
                       {filteredDocs.map(doc => (
                         <tr key={doc.id} className={`transition-colors ${c_table_row}`}>
-                          <td className={`py-4 px-6 font-bold ${c_text_title}`}>{doc.title}</td>
+                          <td className={`py-4 px-6 font-bold ${c_text_title}`}>
+                            <button
+                              onClick={() => window.open(doc.documentUrl, '_blank')}
+                              className="text-left hover:text-[#3370FF] hover:underline underline-offset-2 transition-colors cursor-pointer"
+                              title="Klik untuk melihat dokumen"
+                            >
+                              {doc.title}
+                            </button>
+                          </td>
                           <td className={`py-4 px-6 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{doc.asset.name}</td>
                           <td className="py-4 px-6">
                             <span className={`text-[10px] border px-2 py-0.5 rounded font-semibold uppercase ${isDark ? 'bg-zinc-800/80 border-zinc-700/50 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-500'}`}>
@@ -1798,16 +1841,25 @@ export default function Home() {
                             </span>
                           </td>
                           <td className="py-4 px-6 text-right">
-                            <button 
-                              onClick={() => {
-                                setSelectedDoc(doc);
-                                setRenewExpiryDate(new Date(doc.expiryDate).toISOString().slice(0, 10));
-                                setShowRenewModal(true);
-                              }}
-                              className={`px-3 py-1.5 border rounded-lg text-[10px] font-semibold transition-colors ${isDark ? 'bg-zinc-800 hover:bg-zinc-700/80 border-zinc-700/40 text-zinc-200' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-700 shadow-sm'}`}
-                            >
-                              Perpanjang
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => window.open(doc.documentUrl, '_blank')}
+                                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg text-[10px] font-semibold transition-colors bg-[#3370FF]/10 hover:bg-[#3370FF]/20 border-[#3370FF]/20 text-[#3370FF]"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Lihat
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setSelectedDoc(doc);
+                                  setRenewExpiryDate(new Date(doc.expiryDate).toISOString().slice(0, 10));
+                                  setShowRenewModal(true);
+                                }}
+                                className={`px-3 py-1.5 border rounded-lg text-[10px] font-semibold transition-colors ${isDark ? 'bg-zinc-800 hover:bg-zinc-700/80 border-zinc-700/40 text-zinc-200' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-700 shadow-sm'}`}
+                              >
+                                Perpanjang
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1822,7 +1874,7 @@ export default function Home() {
             {activeTab === 'notifications' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Antrean & Riwayat Notifikasi */}
-                <div className={`border rounded-2xl p-6 space-y-4 lg:col-span-2 ${c_sidebar}`}>
+                <div className={`border rounded-xl p-6 space-y-4 lg:col-span-2 ${c_sidebar}`}>
                   <div className={`border-b pb-3 flex items-center justify-between ${c_border}`}>
                     <h3 className={`font-bold text-sm ${c_text_title}`}>Log Alerts & Email Log</h3>
                     <span className="text-[10px] text-zinc-500 font-bold">Total: {notifications.length}</span>
@@ -1836,7 +1888,7 @@ export default function Home() {
                         <div key={notif.id} className={`p-4 border rounded-xl space-y-2.5 ${c_inner_bg}`}>
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2">
-                              <Mail className="w-4 h-4 text-[#1769FF] shrink-0" />
+                              <Mail className="w-4 h-4 text-[#3370FF] shrink-0" />
                               <h4 className={`text-xs font-bold ${c_text_title}`}>{notif.title}</h4>
                             </div>
                             <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase ${
@@ -1863,14 +1915,14 @@ export default function Home() {
                 </div>
 
                 {/* Simulasi SMTP & Pengingat Status */}
-                <div className={`border rounded-2xl p-6 space-y-6 ${c_sidebar}`}>
+                <div className={`border rounded-xl p-6 space-y-6 ${c_sidebar}`}>
                   <div className={`border-b pb-3 ${c_border}`}>
                     <h3 className={`font-bold text-sm ${c_text_title}`}>Sistem Log SMTP Outlook</h3>
                   </div>
 
-                  <div className={`p-4 border rounded-xl font-mono text-[10px] text-zinc-500 space-y-2 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80' : 'bg-zinc-100 border-zinc-200'}`}>
+                  <div className={`p-4 border rounded-xl font-mono text-[10px] text-zinc-500 space-y-2 ${isDark ? 'bg-[#1B1F26]/80 border-zinc-800/80' : 'bg-zinc-100 border-zinc-200'}`}>
                     <span className="block text-zinc-400 border-b pb-1 mb-1 font-bold">SMTP STATUS LOGS</span>
-                    <p className="text-[#1769FF]">[SYSTEM] Connection secure via Outlook SMTP SSL port 587</p>
+                    <p className="text-[#3370FF]">[SYSTEM] Connection secure via Outlook SMTP SSL port 587</p>
                     <p className="text-emerald-500">[SMTP] Auth validated for fmsp-alert@lintasarta.co.id</p>
                     <p className="text-zinc-500">[IDLE] Waiting for cron triggers...</p>
                     {notifications.filter(n => n.status === 'sent').map(n => (
@@ -1888,10 +1940,10 @@ export default function Home() {
             {activeTab === 'hrd' && (
               <div className="space-y-6">
                 <div className={`flex gap-1 p-1 rounded-xl border w-fit ${c_inner_bg}`}>
-                  <button onClick={() => setHrdSubTab('karyawan')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${hrdSubTab === 'karyawan' ? 'bg-[#1769FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
+                  <button onClick={() => setHrdSubTab('karyawan')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${hrdSubTab === 'karyawan' ? 'bg-[#3370FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
                     <span className="flex items-center gap-2"><Users className="w-3.5 h-3.5" /> Semua Karyawan</span>
                   </button>
-                  <button onClick={() => setHrdSubTab('security')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${hrdSubTab === 'security' ? 'bg-[#1769FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
+                  <button onClick={() => setHrdSubTab('security')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${hrdSubTab === 'security' ? 'bg-[#3370FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
                     <span className="flex items-center gap-2"><Shield className="w-3.5 h-3.5" /> Security Service</span>
                   </button>
                 </div>
@@ -1910,10 +1962,10 @@ export default function Home() {
             {activeTab === 'accounting' && (
               <div className="space-y-6">
                 <div className={`flex gap-1 p-1 rounded-xl border w-fit ${c_inner_bg}`}>
-                  <button onClick={() => setKeuanganSubTab('accounting')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${keuanganSubTab === 'accounting' ? 'bg-[#1769FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
+                  <button onClick={() => setKeuanganSubTab('accounting')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${keuanganSubTab === 'accounting' ? 'bg-[#3370FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
                     <span className="flex items-center gap-2"><DollarSign className="w-3.5 h-3.5" /> Accounting</span>
                   </button>
-                  <button onClick={() => setKeuanganSubTab('rab')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${keuanganSubTab === 'rab' ? 'bg-[#1769FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
+                  <button onClick={() => setKeuanganSubTab('rab')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${keuanganSubTab === 'rab' ? 'bg-[#3370FF] text-white shadow-sm' : `${c_text_sub} hover:${c_text_title}`}`}>
                     <span className="flex items-center gap-2"><Calculator className="w-3.5 h-3.5" /> RAB / Anggaran</span>
                   </button>
                 </div>
@@ -1963,14 +2015,14 @@ export default function Home() {
       {/* MODAL 1: Tambah Aset */}
       {showAssetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-md border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold">Tambah Aset Fisik Baru</h3>
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_add_asset' } }))}
-                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
                   title="Lihat Bantuan Form"
                 >
                   <HelpCircle className="w-3.5 h-3.5" />
@@ -2107,18 +2159,18 @@ export default function Home() {
                   onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files.length) handleAssetPhotoUpload(e.dataTransfer.files); }}
                   className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
                     isDark
-                      ? 'border-zinc-700 hover:border-[#1769FF] hover:bg-[#1769FF]/5'
-                      : 'border-zinc-300 hover:border-[#1769FF] hover:bg-[#1769FF]/5'
+                      ? 'border-zinc-700 hover:border-[#3370FF] hover:bg-[#3370FF]/5'
+                      : 'border-zinc-300 hover:border-[#3370FF] hover:bg-[#3370FF]/5'
                   }`}
                 >
                   {assetPhotoUploading ? (
                     <div className="flex items-center justify-center gap-2 py-2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-[#1769FF]" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#3370FF]" />
                       <span className="text-zinc-500 text-xs">Mengupload foto...</span>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 py-1">
-                      <Camera className="w-6 h-6 text-[#1769FF]/60" />
+                      <Camera className="w-6 h-6 text-[#3370FF]/60" />
                       <span className="text-[10px] text-zinc-500">Klik atau seret foto aset ke sini</span>
                       <span className="text-[9px] text-zinc-400">PNG, JPG — Maks 10MB per file</span>
                     </div>
@@ -2147,7 +2199,7 @@ export default function Home() {
                 )}
               </div>
 
-              <button type="submit" disabled={assetPhotoUploading} className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] disabled:opacity-50 text-white rounded-lg font-semibold transition-colors mt-4">
+              <button type="submit" disabled={assetPhotoUploading} className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] disabled:opacity-50 text-white rounded-lg font-semibold transition-colors mt-4">
                 Simpan Aset
               </button>
             </form>
@@ -2158,7 +2210,7 @@ export default function Home() {
       {/* MODAL DETAIL: Lihat Detail Aset */}
       {showDetailModal && selectedAsset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => { setShowDetailModal(false); setIsEditingAsset(false); }}>
-          <div className={`w-full max-w-2xl border rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto ${c_modal}`} onClick={(e) => e.stopPropagation()}>
+          <div className={`w-full max-w-2xl border rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto ${c_modal}`} onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className={`sticky top-0 z-10 flex items-center justify-between border-b p-6 pb-4 ${c_border} ${isDark ? 'bg-[#0F1C33]' : 'bg-white'}`}>
               <div>
@@ -2171,7 +2223,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_edit_asset' } }))}
-                      className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                      className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
                       title="Lihat Bantuan Form"
                     >
                       <HelpCircle className="w-3.5 h-3.5" />
@@ -2251,7 +2303,7 @@ export default function Home() {
                   <button type="button" onClick={() => setIsEditingAsset(false)} className={`flex-1 py-2.5 border rounded-xl text-xs font-semibold transition-colors ${isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-700'}`}>
                     Batal
                   </button>
-                  <button type="submit" className="flex-1 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold transition-colors">
+                  <button type="submit" className="flex-1 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold transition-colors">
                     Simpan Perubahan
                   </button>
                 </div>
@@ -2266,7 +2318,7 @@ export default function Home() {
                 </div>
                 <div className={`p-4 rounded-xl border ${c_inner_bg}`}>
                   <p className="text-[10px] text-zinc-500 font-semibold uppercase mb-1">Nilai Buku</p>
-                  <p className="font-semibold text-[#1769FF]">{formatRupiah(selectedAsset.bookValue)}</p>
+                  <p className="font-semibold text-[#3370FF]">{formatRupiah(selectedAsset.bookValue)}</p>
                 </div>
               </div>
               <div className={`p-4 rounded-xl border ${c_inner_bg}`}>
@@ -2297,7 +2349,7 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-3">
                     {selectedAsset.photos.map((url: string, idx: number) => (
                       <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
-                        className="relative rounded-xl overflow-hidden border border-zinc-700 hover:ring-2 hover:ring-[#1769FF] transition-all cursor-zoom-in group">
+                        className="relative rounded-xl overflow-hidden border border-zinc-700 hover:ring-2 hover:ring-[#3370FF] transition-all cursor-zoom-in group">
                         <img src={url} alt={`Foto aset ${idx + 1}`} className="w-full h-32 object-cover" />
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-1.5">
                           <p className="text-[9px] text-white font-bold">Foto {idx + 1}</p>
@@ -2317,9 +2369,9 @@ export default function Home() {
                 {selectedAsset.transfers && selectedAsset.transfers.length > 0 ? (
                   <div className="space-y-2">
                     {selectedAsset.transfers.map((t: any, i: number) => (
-                      <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg text-xs ${isDark ? 'bg-[#070E1B]/60' : 'bg-white'}`}>
-                        <div className="w-6 h-6 rounded-full bg-[#1769FF]/10 flex items-center justify-center text-[#1769FF] text-[10px] font-bold">{i+1}</div>
-                        <div className="flex-1"><span className="text-zinc-500">{t.fromLocation}</span><span className="mx-2 text-[#1769FF]">→</span><span className={`font-semibold ${c_text_title}`}>{t.toLocation}</span></div>
+                      <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg text-xs ${isDark ? 'bg-[#2D3039]/60' : 'bg-white'}`}>
+                        <div className="w-6 h-6 rounded-full bg-[#3370FF]/10 flex items-center justify-center text-[#3370FF] text-[10px] font-bold">{i+1}</div>
+                        <div className="flex-1"><span className="text-zinc-500">{t.fromLocation}</span><span className="mx-2 text-[#3370FF]">→</span><span className={`font-semibold ${c_text_title}`}>{t.toLocation}</span></div>
                         <span className="text-[10px] text-zinc-500">{new Date(t.transferredAt).toLocaleDateString('id-ID')}</span>
                       </div>
                     ))}
@@ -2331,7 +2383,7 @@ export default function Home() {
                 {selectedAsset.legalDocuments && selectedAsset.legalDocuments.length > 0 ? (
                   <div className="space-y-2">
                     {selectedAsset.legalDocuments.map((doc: any) => (
-                      <div key={doc.id} className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${isDark ? 'bg-[#070E1B]/60' : 'bg-white'}`}>
+                      <div key={doc.id} className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${isDark ? 'bg-[#2D3039]/60' : 'bg-white'}`}>
                         <div><p className={`font-semibold ${c_text_title}`}>{doc.title}</p><p className="text-zinc-500 text-[10px]">{doc.documentType.toUpperCase()} · Berlaku s/d {new Date(doc.expiryDate).toLocaleDateString('id-ID')}</p></div>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${doc.complianceStatus === 'valid' ? 'bg-emerald-500/10 text-emerald-500' : doc.complianceStatus === 'warning' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>{doc.complianceStatus.toUpperCase()}</span>
                       </div>
@@ -2342,7 +2394,7 @@ export default function Home() {
               <div className="flex gap-3 pt-2">
                 <button onClick={() => startEditAsset(selectedAsset)} className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-colors">Edit Aset</button>
                 <button onClick={() => { setShowDetailModal(false); setShowTransferModal(true); }} className={`flex-1 py-2.5 border rounded-xl text-xs font-semibold transition-colors ${isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-700'}`}>Mutasi Lokasi</button>
-                <button onClick={() => setShowDetailModal(false)} className="flex-1 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold transition-colors">Tutup</button>
+                <button onClick={() => setShowDetailModal(false)} className="flex-1 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold transition-colors">Tutup</button>
               </div>
             </div>
             )}
@@ -2352,14 +2404,14 @@ export default function Home() {
       {/* MODAL 2: Mutasi Lokasi Aset */}
       {showTransferModal && selectedAsset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-md border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold">Mutasi Lokasi Aset</h3>
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_transfer' } }))}
-                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
                   title="Lihat Bantuan Form"
                 >
                   <HelpCircle className="w-3.5 h-3.5" />
@@ -2398,7 +2450,7 @@ export default function Home() {
                 />
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold transition-colors mt-4">
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold transition-colors mt-4">
                 Proses Mutasi Lokasi
               </button>
             </form>
@@ -2409,14 +2461,14 @@ export default function Home() {
       {/* MODAL 3: Tambah Dokumen Legal */}
       {showDocModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-md border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold">Tambah Dokumen Legalitas Aset</h3>
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_add_doc' } }))}
-                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
                   title="Lihat Bantuan Form"
                 >
                   <HelpCircle className="w-3.5 h-3.5" />
@@ -2474,7 +2526,7 @@ export default function Home() {
                       onChange={(e) => setNewDoc({ ...newDoc, documentUrl: e.target.value })}
                       className={`flex-1 px-3 py-2 border rounded-lg outline-none ${c_input}`} 
                     />
-                    <label className="px-3 py-2 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold cursor-pointer transition-all flex items-center gap-1.5 shrink-0 select-none">
+                    <label className="px-3 py-2 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold cursor-pointer transition-all flex items-center gap-1.5 shrink-0 select-none">
                       <Upload className={`w-3.5 h-3.5 ${uploadLoading ? 'animate-spin' : ''}`} />
                       <span>{uploadLoading ? 'Uploading...' : 'Upload'}</span>
                       <input 
@@ -2516,7 +2568,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold transition-colors mt-4">
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold transition-colors mt-4">
                 Unggah & Simpan Dokumen
               </button>
             </form>
@@ -2527,14 +2579,14 @@ export default function Home() {
       {/* MODAL 4: Perpanjang Dokumen */}
       {showRenewModal && selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-md border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold">Perpanjang Dokumen Legalitas</h3>
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_renew_doc' } }))}
-                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
                   title="Lihat Bantuan Form"
                 >
                   <HelpCircle className="w-3.5 h-3.5" />
@@ -2563,7 +2615,7 @@ export default function Home() {
                 />
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold transition-colors mt-4">
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold transition-colors mt-4">
                 Proses Perpanjangan Dokumen
               </button>
             </form>
@@ -2573,7 +2625,7 @@ export default function Home() {
       {/* MODAL 5: QR Code Aset */}
       {showQrModal && selectedAsset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className={`w-full max-w-sm border rounded-2xl shadow-2xl overflow-hidden ${c_modal}`}>
+          <div className={`w-full max-w-sm border rounded-xl shadow-2xl overflow-hidden ${c_modal}`}>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: isDark ? '#1A2744' : '#E0E8F5' }}>
               <div className="flex items-center gap-2">
@@ -2583,7 +2635,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'assets_qr' } }))}
-                      className="p-0.5 rounded-lg hover:bg-zinc-500/10 text-[#1769FF] hover:text-[#4A8AFF] transition-all"
+                      className="p-0.5 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
                       title="Lihat Bantuan Form"
                     >
                       <HelpCircle className="w-3.5 h-3.5" />
@@ -2598,8 +2650,8 @@ export default function Home() {
             {/* QR Display */}
             <div className="flex flex-col items-center px-6 py-6 gap-4">
               {/* Label Tag */}
-              <div className={`w-full rounded-xl border p-4 text-center ${isDark ? 'bg-white/5 border-[#1A2744]' : 'bg-[#F0F5FF] border-[#C7D9FF]'}`}>
-                <p className="text-[10px] font-semibold tracking-widest text-[#1769FF] mb-2">🏢 LINTASARTA FMSP</p>
+              <div className={`w-full rounded-xl border p-4 text-center ${isDark ? 'bg-white/5 border-[#373C43]' : 'bg-[#F0F1F3] border-[#C7D9FF]'}`}>
+                <p className="text-[10px] font-semibold tracking-widest text-[#3370FF] mb-2">🏢 LINTASARTA FMSP</p>
                 <p className="text-sm font-bold leading-tight">{selectedAsset.name}</p>
                 <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{selectedAsset.location}</p>
 
@@ -2609,7 +2661,7 @@ export default function Home() {
                   <div className="w-48 h-48 mx-auto mt-3 rounded-lg bg-zinc-200 animate-pulse" />
                 )}
 
-                <p className="text-[11px] font-mono text-[#1769FF] mt-2 tracking-widest">
+                <p className="text-[11px] font-mono text-[#3370FF] mt-2 tracking-widest">
                   FMSP-{selectedAsset.id.slice(-8).toUpperCase()}
                 </p>
               </div>
@@ -2618,7 +2670,7 @@ export default function Home() {
               <div className="flex gap-3 w-full">
                 <button
                   onClick={handleDownloadQR}
-                  className="flex-1 py-2.5 rounded-lg text-xs font-semibold bg-[#1769FF] hover:bg-[#4A8AFF] text-white transition-colors"
+                  className="flex-1 py-2.5 rounded-lg text-xs font-semibold bg-[#3370FF] hover:bg-[#5B8EFF] text-white transition-colors"
                 >
                   ⬇ Download PNG
                 </button>
@@ -2651,7 +2703,7 @@ export default function Home() {
                 if (outcome === 'accepted') setShowPwaBanner(false);
               }
             }}
-            className="bg-white text-[#1769FF] px-3 py-1 rounded-full text-xs font-bold"
+            className="bg-white text-[#3370FF] px-3 py-1 rounded-full text-xs font-bold"
           >
             Install
           </button>
@@ -2660,31 +2712,36 @@ export default function Home() {
       )}
 
       {/* ── Bottom Navigation (Mobile Only) ─────────── */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-40 md:hidden border-t bottom-nav-safe ${isDark ? 'bg-[#0B1628]/95 border-[#1A2744]' : 'bg-white/95 border-[#E0E8F5]'} backdrop-blur-xl`}>
+      <nav className={`fixed bottom-0 left-0 right-0 z-40 md:hidden border-t bottom-nav-safe ${isDark ? 'dark-glass-header border-[#373C43]/60' : 'glass-header border-[#DEE0E3]/60'}`}>
         <div className="grid grid-cols-5 h-16">
           {([
-            { tab: 'overview'      as const, icon: '📊', label: 'Overview' },
-            { tab: 'assets'        as const, icon: '🏢', label: 'Aset' },
-            { tab: 'workorder'     as const, icon: '🔧', label: 'WO' },
-            { tab: 'maintenance'   as const, icon: '📅', label: 'PM' },
-            { tab: 'notifications' as const, icon: '🔔', label: 'Alerts' },
-          ]).map(({ tab, icon, label }) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-all ${
-                activeTab === tab
-                  ? 'text-[#1769FF]'
-                  : isDark ? 'text-zinc-500' : 'text-zinc-400'
-              }`}
-            >
-              <span className="text-lg leading-none">{icon}</span>
-              <span>{label}</span>
-              {activeTab === tab && (
-                <span className="absolute bottom-0 w-8 h-0.5 bg-[#1769FF] rounded-full" />
-              )}
-            </button>
-          ))}
+            { tab: 'overview'      as const, icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard' },
+            { tab: 'assets'        as const, icon: <Building2 className="w-5 h-5" />, label: 'Aset' },
+            { tab: 'workorder'     as const, icon: <ClipboardList className="w-5 h-5" />, label: 'WO' },
+            { tab: 'maintenance'   as const, icon: <Wrench className="w-5 h-5" />, label: 'PM' },
+            { tab: 'notifications' as const, icon: <Bell className="w-5 h-5" />, label: 'Alerts' },
+          ]).map(({ tab, icon, label }) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-all duration-200 relative ${
+                  isActive
+                    ? 'text-[#3370FF]'
+                    : isDark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-400 hover:text-zinc-600'
+                }`}
+              >
+                <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                  {icon}
+                </span>
+                <span className={`transition-all duration-200 ${isActive ? 'font-bold' : ''}`}>{label}</span>
+                {isActive && (
+                  <span className="absolute top-1 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-[#3370FF] rounded-full" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </nav>
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Users, UserPlus, Shield, Eye, Edit3, UserX, UserCheck,
   Search, X, ChevronDown, RefreshCw, Phone, Building2, MapPin,
+  Lock, Unlock, Key, CheckCircle, XCircle, AlertTriangle, HelpCircle,
 } from 'lucide-react';
 import { ROLES, ROLE_NAMES, getRoleConfig, canManageRole, getAssignableRoles, type RoleName } from '@/lib/rbac';
 
@@ -16,8 +17,19 @@ interface User {
   department?: string;
   phone?: string;
   region?: string;
+  failedLoginAttempts?: number;
+  lockedUntil?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ResetRequest {
+  id: string;
+  userId: string;
+  status: string;
+  requestedAt: string;
+  reason?: string;
+  user: { email: string; name: string };
 }
 
 interface Props {
@@ -42,10 +54,12 @@ const EMPTY_FORM = {
 
 export default function UserManagementView({ token, isDark, currentUserEmail, currentUserRole }: Props) {
   const [users, setUsers]           = useState<User[]>([]);
+  const [pendingResets, setPendingResets] = useState<ResetRequest[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
   const [search, setSearch]         = useState('');
   const [filterRole, setFilterRole] = useState('all');
+  const [filterRegion, setFilterRegion] = useState('all');
   const [showInactive, setShowInactive] = useState(false);
 
   // Modal state
@@ -61,14 +75,14 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
 
   // Color shortcuts
   const c = {
-    card:  isDark ? 'bg-[#0F1C33] border-[#1A2744]' : 'bg-white border-[#E0E8F5]',
-    inner: isDark ? 'bg-[#0B1628] border-[#1A2744]' : 'bg-[#F8FAFF] border-[#E0E8F5]',
-    input: isDark ? 'bg-[#0B1628] border-[#1A2744] text-white placeholder-zinc-600' : 'bg-white border-[#D1DEF5] text-zinc-800 placeholder-zinc-400',
+    card:  isDark ? 'bg-[#0F1C33] border-[#373C43]' : 'bg-white border-[#DEE0E3]',
+    inner: isDark ? 'bg-[#1B1F26] border-[#373C43]' : 'bg-[#F8FAFF] border-[#DEE0E3]',
+    input: isDark ? 'bg-[#1B1F26] border-[#373C43] text-white placeholder-zinc-600' : 'bg-white border-[#D1DEF5] text-zinc-800 placeholder-zinc-400',
     text:  isDark ? 'text-white' : 'text-zinc-800',
     sub:   isDark ? 'text-zinc-400' : 'text-zinc-500',
-    th:    isDark ? 'bg-[#0B1628] text-zinc-400' : 'bg-[#F0F5FF] text-zinc-500',
+    th:    isDark ? 'bg-[#1B1F26] text-zinc-400' : 'bg-[#F0F1F3] text-zinc-500',
     hover: isDark ? 'hover:bg-white/5' : 'hover:bg-[#F8FAFF]',
-    border: isDark ? 'border-[#1A2744]' : 'border-[#E0E8F5]',
+    border: isDark ? 'border-[#373C43]' : 'border-[#DEE0E3]',
   };
 
   const fetchUsers = useCallback(async () => {
@@ -79,11 +93,44 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await r.json();
-      if (data.success) setUsers(data.data);
+      if (data.success) {
+        setUsers(data.data);
+        setPendingResets(data.pendingResets || []);
+      }
       else setError(data.error || 'Gagal memuat data');
     } catch { setError('Koneksi error'); }
     finally { setLoading(false); }
   }, [token]);
+
+  const handleUnlock = async (userId: string) => {
+    try {
+      const r = await fetch('/api/management/users', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, unlock: true }),
+      });
+      const data = await r.json();
+      if (data.success) fetchUsers();
+      else alert(data.error);
+    } catch { alert('Gagal unlock akun'); }
+  };
+
+  const handleResetAction = async (resetId: string, approve: boolean) => {
+    try {
+      const r = await fetch('/api/management/users', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(approve ? { approveResetId: resetId } : { rejectResetId: resetId }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        if (approve && data.token) {
+          alert(`Reset password disetujui.\nToken: ${data.token}\n\nToken berlaku 1 jam. User dapat menggunakan token ini untuk mereset password.`);
+        }
+        fetchUsers();
+      } else alert(data.error);
+    } catch { alert('Gagal memproses permintaan'); }
+  };
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -160,8 +207,9 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                         u.department?.toLowerCase().includes(search.toLowerCase()) ||
                         u.region?.toLowerCase().includes(search.toLowerCase());
     const matchRole = filterRole === 'all' || u.role === filterRole;
+    const matchRegion = filterRegion === 'all' || (filterRegion === 'nasional' ? !u.region : u.region === filterRegion);
     const matchActive = showInactive ? true : u.isActive;
-    return matchSearch && matchRole && matchActive;
+    return matchSearch && matchRole && matchRegion && matchActive;
   });
 
   // Group stats by role
@@ -173,7 +221,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
   return (
     <div className="space-y-6 p-6">
       {/* ── Header ── */}
-      <div className={`rounded-2xl border p-6 ${c.card}`}>
+      <div className={`rounded-xl border p-6 ${c.card}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className={`text-lg font-bold ${c.text}`}>Manajemen Pengguna</h2>
@@ -181,7 +229,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
           </div>
           <button
             onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-sm font-semibold shadow-lg shadow-[#1769FF]/20 transition-all active:scale-[0.98]"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-sm font-semibold shadow-lg shadow-[#3370FF]/20 transition-all active:scale-[0.98]"
           >
             <UserPlus className="w-4 h-4" />
             Tambah User
@@ -192,7 +240,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mt-5">
           <div className={`rounded-xl border p-3 text-center ${c.inner}`}>
             <p className="text-xl">👥</p>
-            <p className={`text-2xl font-bold mt-1 text-[#1769FF]`}>{users.length}</p>
+            <p className={`text-2xl font-bold mt-1 text-[#3370FF]`}>{users.length}</p>
             <p className={`text-[9px] mt-0.5 ${c.sub}`}>Total</p>
           </div>
           {ROLE_NAMES.map(r => {
@@ -209,13 +257,13 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
       </div>
 
       {/* ── Filter Bar ── */}
-      <div className={`flex flex-col sm:flex-row gap-3 p-4 rounded-2xl border ${c.card}`}>
+      <div className={`flex flex-col sm:flex-row gap-3 p-4 rounded-xl border ${c.card}`}>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
             type="text" placeholder="Cari nama, email, departemen, region..."
             value={search} onChange={e => setSearch(e.target.value)}
-            className={`w-full pl-9 pr-3 py-2 rounded-xl border text-sm outline-none focus:border-[#1769FF] transition-colors ${c.input}`}
+            className={`w-full pl-9 pr-3 py-2 rounded-xl border text-sm outline-none focus:border-[#3370FF] transition-colors ${c.input}`}
           />
         </div>
         <select
@@ -227,13 +275,24 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
             <option key={r} value={r}>{ROLE_ICONS[r]} {getRoleConfig(r).label}</option>
           ))}
         </select>
+        <select
+          value={filterRegion} onChange={e => setFilterRegion(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-sm outline-none ${c.input}`}
+        >
+          <option value="all">Semua Region</option>
+          <option value="nasional">🏛️ Nasional (Tanpa Region)</option>
+          <option value="Jakarta">🏢 Jakarta</option>
+          <option value="Medan">🌴 Medan</option>
+          <option value="Bandung">🏔️ Bandung</option>
+          <option value="Surabaya">🌊 Surabaya</option>
+        </select>
         <label className={`flex items-center gap-2 text-xs cursor-pointer ${c.sub}`}>
           <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="rounded" />
           Tampilkan non-aktif
         </label>
         <button onClick={fetchUsers} disabled={loading}
           className={`p-2 rounded-xl border transition-colors ${c.inner}`}>
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#1769FF]' : c.sub}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#3370FF]' : c.sub}`} />
         </button>
       </div>
 
@@ -241,7 +300,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
       {error ? (
         <div className="text-center py-12 text-red-400 text-sm">{error}</div>
       ) : (
-        <div className={`rounded-2xl border overflow-hidden ${c.card}`}>
+        <div className={`rounded-xl border overflow-hidden ${c.card}`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -291,7 +350,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                             </div>
                             <div className="min-w-0">
                               <p className={`font-semibold text-sm truncate ${u.isActive ? c.text : 'text-zinc-500 line-through'}`}>
-                                {u.name} {isSelf && <span className="text-[10px] text-[#1769FF] font-bold no-underline">(Anda)</span>}
+                                {u.name} {isSelf && <span className="text-[10px] text-[#3370FF] font-bold no-underline">(Anda)</span>}
                               </p>
                               <p className={`text-xs truncate ${c.sub}`}>{u.email}</p>
                             </div>
@@ -319,13 +378,20 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                           {u.department || <span className="italic opacity-50">—</span>}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            u.isActive
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
-                          }`}>
-                            {u.isActive ? 'Aktif' : 'Non-aktif'}
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              u.isActive
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
+                            }`}>
+                              {u.isActive ? 'Aktif' : 'Non-aktif'}
+                            </span>
+                            {u.lockedUntil && new Date(u.lockedUntil) > new Date() && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                                <Lock className="w-2.5 h-2.5" /> Terkunci
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-1.5">
@@ -336,6 +402,15 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                                 className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {canManage && u.lockedUntil && new Date(u.lockedUntil) > new Date() && (
+                              <button
+                                onClick={() => handleUnlock(u.id)}
+                                title="Unlock Akun"
+                                className="p-1.5 rounded-lg transition-colors hover:bg-amber-500/10 text-amber-400"
+                              >
+                                <Unlock className="w-3.5 h-3.5" />
                               </button>
                             )}
                             {canManage && (
@@ -363,15 +438,63 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
         </div>
       )}
 
+      {/* ── Pending Password Reset Requests ── */}
+      {pendingResets.length > 0 && (
+        <div className={`rounded-xl border p-5 ${c.card}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Key className="w-4 h-4 text-amber-400" />
+            <h3 className={`text-sm font-bold ${c.text}`}>Permintaan Reset Password</h3>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              {pendingResets.length} menunggu
+            </span>
+          </div>
+          <div className="space-y-2">
+            {pendingResets.map(r => (
+              <div key={r.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border ${c.inner}`}>
+                <div>
+                  <p className={`text-sm font-semibold ${c.text}`}>{r.user.name}</p>
+                  <p className={`text-xs ${c.sub}`}>{r.user.email} · {new Date(r.requestedAt).toLocaleString('id-ID')}</p>
+                  {r.reason && <p className={`text-xs mt-0.5 ${c.sub}`}>Alasan: {r.reason}</p>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleResetAction(r.id, true)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-colors"
+                  >
+                    <CheckCircle className="w-3 h-3" /> Setujui
+                  </button>
+                  <button
+                    onClick={() => handleResetAction(r.id, false)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
+                  >
+                    <XCircle className="w-3 h-3" /> Tolak
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Create / Edit Modal ── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-          <div className={`w-full sm:max-w-md border rounded-t-2xl sm:rounded-2xl shadow-2xl modal-mobile sm:modal-desktop ${c.card}`}>
+          <div className={`w-full sm:max-w-md border rounded-t-2xl sm:rounded-xl shadow-2xl modal-mobile sm:modal-desktop ${c.card}`}>
             <div className={`flex items-center justify-between px-6 py-4 border-b ${c.border}`}>
               <div>
-                <h3 className={`text-sm font-bold ${c.text}`}>
-                  {editUser ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}
-                </h3>
+                <div className="flex items-center gap-1.5">
+                  <h3 className={`text-sm font-bold ${c.text}`}>
+                    {editUser ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'users_add' } }))}
+                    className="p-0.5 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
+                    title="Lihat Bantuan Form"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <p className={`text-xs mt-0.5 ${c.sub}`}>
                   {editUser ? `Mengedit: ${editUser.email}` : 'Buat akun pengguna baru'}
                 </p>
@@ -384,7 +507,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
               <div>
                 <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>Nama Lengkap *</label>
                 <input type="text" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="contoh: Ahmad Fauzi" className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm transition-colors ${c.input}`} />
+                  placeholder="contoh: Ahmad Fauzi" className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#3370FF] text-sm transition-colors ${c.input}`} />
               </div>
 
               {/* Email — readonly on edit */}
@@ -393,14 +516,14 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                 <input type="email" required value={form.email} disabled={!!editUser}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="nama@lintasarta.co.id"
-                  className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm ${editUser ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#1769FF]'} transition-colors ${c.input}`} />
+                  className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm ${editUser ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#3370FF]'} transition-colors ${c.input}`} />
               </div>
 
               {/* Role — 6 tier */}
               <div>
                 <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>Role *</label>
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm ${c.input}`}>
+                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#3370FF] text-sm ${c.input}`}>
                   {assignableRoles.map(r => {
                     const rc = getRoleConfig(r);
                     return (
@@ -415,12 +538,28 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
               {/* Region */}
               <div>
                 <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>
-                  Region / Lokasi
-                  <span className={`font-normal ml-1 ${c.sub}`}>(wajib untuk Admin Regional & Admin Lokasi)</span>
+                  Region / Wilayah Kerja
+                  {['admin_regional', 'admin_lokasi', 'user'].includes(form.role) && (
+                    <span className="text-red-400 ml-1">*</span>
+                  )}
                 </label>
-                <input type="text" value={form.region} onChange={e => setForm(f => ({ ...f, region: e.target.value }))}
-                  placeholder="contoh: Jatiluhur, Purwakarta, Jawa Barat"
-                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm transition-colors ${c.input}`} />
+                <select
+                  value={form.region}
+                  onChange={e => setForm(f => ({ ...f, region: e.target.value }))}
+                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#3370FF] text-sm transition-colors ${c.input}`}
+                >
+                  <option value="">— Nasional (Semua Region) —</option>
+                  <option value="Jakarta">🏢 Jakarta (Kantor Pusat)</option>
+                  <option value="Medan">🌴 Medan (Sumatera Utara)</option>
+                  <option value="Bandung">🏔️ Bandung (Jawa Barat + Jatiluhur)</option>
+                  <option value="Surabaya">🌊 Surabaya (Jawa Timur)</option>
+                </select>
+                {['superadmin', 'manager_fms', 'admin_pusat'].includes(form.role) && form.region && (
+                  <p className="text-[10px] mt-1 text-amber-400">⚠ Role ini bersifat nasional — region akan diabaikan untuk filter data.</p>
+                )}
+                {['admin_regional', 'admin_lokasi', 'user'].includes(form.role) && !form.region && (
+                  <p className="text-[10px] mt-1 text-red-400">⚠ Region wajib diisi untuk role ini agar data terfilter dengan benar.</p>
+                )}
               </div>
 
               {/* Department + Phone */}
@@ -429,13 +568,13 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                   <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>Departemen</label>
                   <input type="text" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
                     placeholder="FM, IT, HR..."
-                    className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm ${c.input}`} />
+                    className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#3370FF] text-sm ${c.input}`} />
                 </div>
                 <div>
                   <label className={`block text-xs font-semibold mb-1 ${c.sub}`}>No. HP</label>
                   <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                     placeholder="08xxxxxxxxxx"
-                    className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm ${c.input}`} />
+                    className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#3370FF] text-sm ${c.input}`} />
                 </div>
               </div>
 
@@ -447,7 +586,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
                 <input type="password" value={form.password} required={!editUser}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder={editUser ? 'Isi untuk mengubah password' : 'Min. 8 karakter'}
-                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1769FF] text-sm ${c.input}`} />
+                  className={`w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#3370FF] text-sm ${c.input}`} />
               </div>
 
               {formError && (
@@ -455,7 +594,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
               )}
 
               <button type="submit" disabled={submitting}
-                className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2">
+                className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2">
                 {submitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                 {editUser ? 'Simpan Perubahan' : 'Buat Pengguna'}
               </button>
@@ -467,7 +606,7 @@ export default function UserManagementView({ token, isDark, currentUserEmail, cu
       {/* ── Confirm Toggle Modal ── */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-sm border rounded-2xl shadow-2xl p-6 ${c.card}`}>
+          <div className={`w-full max-w-sm border rounded-xl shadow-2xl p-6 ${c.card}`}>
             <div className="text-center mb-5">
               <div className="text-4xl mb-3">{showConfirm.deactivate ? '🚫' : '✅'}</div>
               <h3 className={`text-sm font-bold ${c.text}`}>

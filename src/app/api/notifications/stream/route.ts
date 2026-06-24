@@ -1,26 +1,33 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
-import jwt from 'jsonwebtoken';
+import { consumeTicket } from '../ticket/route';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fmsp-lintasarta-secret-key-change-in-production-2026';
-
+// ────────────────────────────────────────────────────────
 // GET /api/notifications/stream
 // Server-Sent Events — push notifikasi real-time ke browser
+// SECURITY: Uses short-lived, single-use ticket instead of JWT in query param.
+// Client must first POST to /api/notifications/ticket to exchange JWT → ticket.
+// ────────────────────────────────────────────────────────
+
+// ── SSE Connection Limiter ──
+const sseConnections = new Map<string, number>(); // email → active count
+const MAX_SSE_PER_USER = 3;
+
 export async function GET(req: NextRequest) {
-  // Auth dari query param (SSE tidak bisa set header)
-  const token = req.nextUrl.searchParams.get('token');
-  if (!token) {
-    return new Response('Unauthorized', { status: 401 });
+  // Auth via ticket (NOT raw JWT — tickets are single-use, 60s TTL)
+  const ticket = req.nextUrl.searchParams.get('ticket');
+  const userEmail = consumeTicket(ticket);
+
+  if (!userEmail) {
+    return new Response('Unauthorized: Invalid or expired ticket. Request a new ticket via POST /api/notifications/ticket.', { status: 401 });
   }
 
-  let userPayload: any;
-  try {
-    userPayload = jwt.verify(token, JWT_SECRET) as any;
-  } catch {
-    return new Response('Invalid token', { status: 401 });
+  // ── Connection limit per user ──
+  const currentCount = sseConnections.get(userEmail) || 0;
+  if (currentCount >= MAX_SSE_PER_USER) {
+    return new Response('Too many SSE connections. Close existing connections first.', { status: 429 });
   }
-
-  const userEmail = userPayload.email;
+  sseConnections.set(userEmail, currentCount + 1);
 
   // SSE stream
   const encoder = new TextEncoder();
@@ -33,6 +40,19 @@ export async function GET(req: NextRequest) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch { isClosed = true; }
+      };
+
+      // Cleanup helper — decrement connection count
+      const cleanup = () => {
+        if (!isClosed) {
+          isClosed = true;
+          const count = sseConnections.get(userEmail) || 1;
+          if (count <= 1) {
+            sseConnections.delete(userEmail);
+          } else {
+            sseConnections.set(userEmail, count - 1);
+          }
+        }
       };
 
       // Initial heartbeat
@@ -79,7 +99,7 @@ export async function GET(req: NextRequest) {
           });
           send({ type: 'badge', count: total });
         } catch {
-          isClosed = true;
+          cleanup();
           clearInterval(interval);
           try { controller.close(); } catch {}
         }
@@ -91,14 +111,14 @@ export async function GET(req: NextRequest) {
         try {
           controller.enqueue(encoder.encode(': heartbeat\n\n'));
         } catch {
-          isClosed = true;
+          cleanup();
           clearInterval(heartbeat);
         }
       }, 25000);
 
       // Cleanup on abort
       req.signal.addEventListener('abort', () => {
-        isClosed = true;
+        cleanup();
         clearInterval(interval);
         clearInterval(heartbeat);
         try { controller.close(); } catch {}

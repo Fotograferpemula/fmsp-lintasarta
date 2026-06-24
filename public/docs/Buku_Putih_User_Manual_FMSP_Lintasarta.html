@@ -200,6 +200,7 @@
             <li><strong>2. Keamanan Sistem & Autentikasi</strong></li>
             <li style="padding-left: 20px;">2.1 Login & Google SSO (Single Sign-On)</li>
             <li style="padding-left: 20px;">2.2 Role-Based Access Control (RBAC) — 6 Tingkat</li>
+            <li style="padding-left: 20px;">2.2.1 Struktur 4 Regional & Partisi Data</li>
             <li style="padding-left: 20px;">2.3 Proteksi Brute Force & Account Lockout</li>
             <li style="padding-left: 20px;">2.4 Manajemen Pengguna & Reset Password</li>
             <li style="padding-left: 20px;">2.5 Audit Log Sistem</li>
@@ -357,6 +358,82 @@
             </tbody>
         </table>
         <p>Admin Regional dan Admin Lokasi hanya dapat melihat dan mengelola data aset yang berada di wilayah/gedung yang ditugaskan kepada mereka (region filter).</p>
+
+        <h2>2.2.1 Struktur 4 Regional & Partisi Data</h2>
+        <p>FMSP Lintasarta mengimplementasikan <strong>partisi data berbasis 4 regional</strong> yang mencerminkan struktur organisasi FMS Lintasarta di Indonesia:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Regional</th>
+                    <th>Kode</th>
+                    <th>Cakupan Wilayah</th>
+                    <th>Kantor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Jakarta (Pusat)</strong></td>
+                    <td>JKT</td>
+                    <td>DKI Jakarta & Kantor Pusat</td>
+                    <td>Kantor Pusat Lintasarta</td>
+                </tr>
+                <tr>
+                    <td><strong>Medan</strong></td>
+                    <td>MDN</td>
+                    <td>Sumatera Utara & sekitarnya</td>
+                    <td>Kantor Regional Medan</td>
+                </tr>
+                <tr>
+                    <td><strong>Bandung</strong></td>
+                    <td>BDG</td>
+                    <td>Jawa Barat, termasuk Jatiluhur</td>
+                    <td>Kantor Regional Bandung + Data Center Jatiluhur</td>
+                </tr>
+                <tr>
+                    <td><strong>Surabaya</strong></td>
+                    <td>SBY</td>
+                    <td>Jawa Timur & sekitarnya</td>
+                    <td>Kantor Regional Surabaya</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Aturan Partisi Data</h3>
+        <ul>
+            <li><strong>SuperAdmin, Manager FMS, Admin Pusat:</strong> Melihat data <em>seluruh regional</em> (scope nasional). Tidak memiliki field region.</li>
+            <li><strong>Admin Regional:</strong> Melihat dan mengelola data <em>hanya di regional yang ditugaskan</em>. Contoh: Admin Regional Medan hanya melihat aset, dokumen, inventory, dan karyawan Medan.</li>
+            <li><strong>Admin Lokasi & User:</strong> Melihat data sesuai regional yang ditugaskan. Input data baru otomatis terikat ke regional mereka.</li>
+        </ul>
+
+        <h3>Mekanisme Filter Regional</h3>
+        <p>Sistem menggunakan <em>location-based string matching</em>: field <code>location</code> pada aset, inventory, dan data operasional HARUS mengandung nama kota regional ("Medan", "Bandung", "Surabaya", atau "Jakarta") agar filter otomatis bekerja. Contoh lokasi yang valid:</p>
+        <ul>
+            <li>"Jl. Gatot Subroto No. 212, <strong>Medan</strong>" ✅</li>
+            <li>"Data Center Room A, Jatiluhur — Regional <strong>Bandung</strong>" ✅</li>
+            <li>"Kantor <strong>Surabaya</strong>, Gedung Lt. 2" ✅</li>
+        </ul>
+
+        <h3>Akun Standar per Regional</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Regional</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Pusat</td><td>superadmin@lintasarta.co.id</td><td>SuperAdmin</td></tr>
+                <tr><td>Pusat</td><td>manager@lintasarta.co.id</td><td>Manager FMS</td></tr>
+                <tr><td>Pusat</td><td>admin@lintasarta.co.id</td><td>Admin Pusat</td></tr>
+                <tr><td>Medan</td><td>regional.medan@lintasarta.co.id</td><td>Admin Regional</td></tr>
+                <tr><td>Bandung</td><td>regional.bandung@lintasarta.co.id</td><td>Admin Regional</td></tr>
+                <tr><td>Surabaya</td><td>regional.surabaya@lintasarta.co.id</td><td>Admin Regional</td></tr>
+            </tbody>
+        </table>
+        <div class="info-box">
+            <strong>ℹ️ Penting:</strong> Jatiluhur secara organisasional masuk ke <strong>Regional Bandung</strong>. Aset dan personel di Jatiluhur dikelola oleh Admin Regional Bandung. Setiap regional memiliki gudang inventory, anggaran (RAB), dan vendor contract terpisah.
+        </div>
 
         <h2>2.3 Proteksi Brute Force & Account Lockout</h2>
         <p>Untuk mencegah serangan brute force, akun pengguna otomatis <strong>dikunci selama 15 menit</strong> setelah <strong>5 kali gagal login</strong> berturut-turut. Counter gagal login di-reset otomatis setelah login berhasil. Selain itu, sistem menerapkan <strong>rate limiting</strong> pada endpoint login dan SSO untuk mencegah request berlebihan.</p>

@@ -2,25 +2,25 @@ version: '3.8'
 
 services:
   # ──────── PostgreSQL Database ────────
-  db:
+  postgres:
     image: postgres:16-alpine
-    container_name: fmsp-db
+    container_name: fmsp-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: fmsp_user
-      POSTGRES_PASSWORD: fmsp_password123
-      POSTGRES_DB: fmsp_db
+      POSTGRES_USER: ${POSTGRES_USER:-fmsp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-fmsp_db}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5434:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fmsp_user -d fmsp_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fmsp_user} -d ${POSTGRES_DB:-fmsp_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # ──────── FMSP Application ────────
+  # ──────── FMSP Application (Production) ────────
   app:
     build:
       context: .
@@ -28,15 +28,26 @@ services:
     container_name: fmsp-app
     restart: unless-stopped
     ports:
-      - "3847:3847"
+      - "3001:3001"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: "postgresql://fmsp_user:fmsp_password123@db:5432/fmsp_db?schema=public"
-      PORT: "3847"
+      # Override DATABASE_URL to use Docker internal network (postgres service name)
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-fmsp_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fmsp_db}?schema=public"
+      PORT: "3001"
+      HOSTNAME: "0.0.0.0"
       NODE_ENV: "production"
-      JWT_SECRET: "fmsp-lintasarta-jwt-secret-change-me-in-production"
+      APP_BASE_URL: "http://localhost:3001"
+      # JWT_SECRET is loaded from .env via env_file
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   pgdata:

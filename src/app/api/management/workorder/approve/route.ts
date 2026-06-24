@@ -109,6 +109,7 @@ Akses FMSP untuk melihat detail lebih lanjut.
       details: action === 'approve'
         ? `WO ${wo.ticketNumber} disetujui`
         : `WO ${wo.ticketNumber} ditolak: ${reason}`,
+      ip: req.clientIp || '0.0.0.0',
     },
   });
 

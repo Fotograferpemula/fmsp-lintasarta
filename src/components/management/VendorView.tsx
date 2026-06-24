@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { FileSignature, Plus, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { FileSignature, Plus, Trash2, RefreshCw, AlertTriangle, HelpCircle } from 'lucide-react';
 
 interface VendorContractItem {
   id: string; vendorName: string; contractTitle: string; contractType: string;
@@ -10,11 +10,11 @@ interface VendorContractItem {
 
 export default function VendorView({ isDark, token }: { isDark: boolean; token: string }) {
   const c_card = isDark ? 'bg-zinc-900/30 border-zinc-800/80' : 'bg-white border-zinc-200 shadow-sm';
-  const c_input = isDark ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
+  const c_input = isDark ? 'bg-[#1B1F26] border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
   const c_modal = isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
   const c_text = isDark ? 'text-white' : 'text-zinc-800';
   const c_sub = isDark ? 'text-zinc-400' : 'text-zinc-500';
-  const c_tbl_h = isDark ? 'bg-zinc-950/40 text-zinc-400' : 'bg-zinc-100 text-zinc-600';
+  const c_tbl_h = isDark ? 'bg-[#1B1F26]/40 text-zinc-400' : 'bg-zinc-100 text-zinc-600';
   const c_tbl_r = isDark ? 'hover:bg-zinc-900/10 border-zinc-800/60' : 'hover:bg-zinc-50 border-zinc-200';
 
   const [items, setItems] = useState<VendorContractItem[]>([]);
@@ -46,7 +46,7 @@ export default function VendorView({ isDark, token }: { isDark: boolean; token: 
         <div><h2 className={`text-lg font-bold ${c_text}`}>Vendor & Contract Management</h2><p className={`text-xs ${c_sub}`}>Pemantauan kontrak vendor — BRD §2.3</p></div>
         <div className="flex gap-2">
           <button onClick={fetchData} className={`p-2 rounded-lg border ${c_card}`}><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg text-xs font-semibold"><Plus className="w-3.5 h-3.5" /> Tambah Kontrak</button>
+          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg text-xs font-semibold"><Plus className="w-3.5 h-3.5" /> Tambah Kontrak</button>
         </div>
       </div>
 
@@ -69,7 +69,7 @@ export default function VendorView({ isDark, token }: { isDark: boolean; token: 
             <th className="px-4 py-3 text-left font-semibold">Aksi</th>
           </tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={8} className="text-center py-8"><RefreshCw className="w-5 h-5 mx-auto animate-spin text-[#1769FF]" /></td></tr> :
+            {loading ? <tr><td colSpan={8} className="text-center py-8"><RefreshCw className="w-5 h-5 mx-auto animate-spin text-[#3370FF]" /></td></tr> :
             items.length === 0 ? <tr><td colSpan={8} className={`text-center py-8 ${c_sub}`}>Belum ada kontrak vendor.</td></tr> :
             items.map(item => (
               <tr key={item.id} className={`border-t ${c_tbl_r}`}>
@@ -89,8 +89,21 @@ export default function VendorView({ isDark, token }: { isDark: boolean; token: 
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-lg border p-6 rounded-2xl shadow-2xl space-y-4 ${c_modal}`}>
-            <div className="flex items-center justify-between"><h3 className="text-base font-bold">Tambah Kontrak Vendor</h3><button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button></div>
+          <div className={`w-full max-w-lg border p-6 rounded-xl shadow-2xl space-y-4 ${c_modal}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">Tambah Kontrak Vendor</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'vendor_add' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={`block mb-1 ${c_sub}`}>Nama Vendor *</label><input required value={form.vendorName} onChange={e => setForm({...form, vendorName: e.target.value})} className={`w-full px-3 py-2 border rounded-lg ${c_input}`} /></div>
@@ -106,7 +119,7 @@ export default function VendorView({ isDark, token }: { isDark: boolean; token: 
                 <div><label className={`block mb-1 ${c_sub}`}>PIC Email *</label><input type="email" required value={form.pic} onChange={e => setForm({...form, pic: e.target.value})} className={`w-full px-3 py-2 border rounded-lg ${c_input}`} /></div>
               </div>
               <div><label className={`block mb-1 ${c_sub}`}>Catatan</label><input value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className={`w-full px-3 py-2 border rounded-lg ${c_input}`} /></div>
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold mt-2">Simpan Kontrak</button>
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold mt-2">Simpan Kontrak</button>
             </form>
           </div>
         </div>

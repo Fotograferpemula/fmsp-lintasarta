@@ -31,7 +31,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=8080
+# PORT is set via docker-compose / fly.toml, defaults to 3001
+ENV PORT=${PORT:-3001}
 ENV HOSTNAME="0.0.0.0"
 
 RUN addgroup --system --gid 1001 nodejs
@@ -47,6 +48,6 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 USER nextjs
 
-EXPOSE 8080
+EXPOSE 3001
 
 CMD ["node", "server.js"]

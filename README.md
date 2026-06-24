@@ -58,10 +58,15 @@ npm run dev
 
 Buka [http://localhost:3847](http://localhost:3847)
 
-**Login default:**
-- Email: `admin@lintasarta.co.id` / Password: `admin123`
-- Email: `operator@lintasarta.co.id` / Password: `operator123`
-- Email: `viewer@lintasarta.co.id` / Password: `viewer123`
+**Login default (seed data):**
+- `superadmin@lintasarta.co.id` / Password: `superadmin123`
+- `manager@lintasarta.co.id` / Password: `manager123`
+- `admin.pusat@lintasarta.co.id` / Password: `adminpusat123`
+- `admin.regional@lintasarta.co.id` / Password: `adminregional123`
+- `admin.lokasi@lintasarta.co.id` / Password: `adminlokasi123`
+- `user@lintasarta.co.id` / Password: `user123`
+
+> ⚠️ Ganti password default setelah login pertama (flag `mustChangePassword`).
 
 ## 🐳 Docker
 
@@ -112,13 +117,20 @@ prisma/
 └── seed.ts            # Data seeder
 ```
 
-## 🔒 Role Akses
+## 🔒 Role Akses (RBAC 6 Tingkat)
 
-| Role | Akses |
-|---|---|
-| `admin` | Full CRUD semua modul + Audit Log + Admin Master Data |
-| `operator` | Read + Write operasional (tanpa delete) |
-| `viewer` | Read only |
+Sesuai BRD §2.2, sistem menerapkan RBAC 6 tingkat dengan filter data berbasis region:
+
+| Role | Level | Akses | Scope Data |
+|---|---|---|---|
+| `superadmin` | 1 | Full CRUD semua modul + Approve WO + Audit Log + Master Data + App Settings | Nasional |
+| `manager_fms` | 2 | Read All + Approve/Reject WO + Read + Approve RAB | Nasional |
+| `admin_pusat` | 2 | Full CRUD modul operasional + Create/Assign WO + Read Only RAB | Nasional |
+| `admin_regional` | 3 | CRUD modul operasional di region + Create/Assign WO + Read Only RAB | Region Tertentu |
+| `admin_lokasi` | 3 | CRUD modul operasional di lokasi + Create WO | Lokasi Tertentu |
+| `user` | 4 | Read Only + Update Status WO | Sesuai Tugas |
+
+**Catatan:** `admin_regional` dan `admin_lokasi` hanya dapat melihat dan mengelola data aset yang berada di wilayah/gedung yang ditugaskan kepada mereka (region filter).
 
 ---
 

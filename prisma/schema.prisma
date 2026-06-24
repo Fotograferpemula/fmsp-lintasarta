@@ -18,13 +18,55 @@ model User {
   role         String   @default("user") // superadmin | manager_fms | admin_pusat | admin_regional | admin_lokasi | user
   passwordHash String
   isActive     Boolean  @default(true)
+  mustChangePassword Boolean @default(false) // Force password change on first login
   department   String?  // e.g. FM, IT, HR
   phone        String?
   region       String?  // Region/lokasi untuk filter data (admin_regional, admin_lokasi)
+  // Account lockout (brute force protection)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastFailedLogin     DateTime?
+  // Password reset (admin-approval flow)
+  resetToken          String?   @unique
+  resetTokenExpiry    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  passwordResetRequests PasswordResetRequest[]
+  pushSubscriptions     PushSubscription[]
+
   @@map("users")
+}
+
+// Admin-approval password reset request
+model PasswordResetRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String   @default("pending") // pending | approved | rejected
+  requestedAt DateTime @default(now())
+  reviewedBy  String?  // Admin email who approved/rejected
+  reviewedAt  DateTime?
+  reason      String?  // Optional reason from user
+  token       String?  @unique // Generated after approval, used to reset
+  tokenExpiry DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@map("password_reset_requests")
+}
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String   // Public key for encryption
+  auth       String   // Auth secret
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model Asset {
@@ -40,6 +82,7 @@ model Asset {
   purchaseCost          Float?              // Harga beli awal
   expectedLifeYrs       Int?                // Estimasi umur pakai (tahun)
   lifecycleStatus       String              @default("operational") // operational | depreciated | retired
+  photos                String[]            @default([]) // URLs of asset photos
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   transfers             AssetTransfer[]
@@ -187,6 +230,7 @@ model InventoryItem {
   location      String   // Warehouse A, B, etc.
   unitPrice     Float
   lastRestocked DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
 
   @@map("inventory_items")
 }
@@ -199,6 +243,7 @@ model Smk3Item {
   lastChecked DateTime
   status      String   @default("ok") // ok | warning | danger
   checkedBy   String
+  updatedAt   DateTime @updatedAt @default(now())
 
   @@map("smk3_items")
 }
@@ -213,6 +258,7 @@ model AccountingTransaction {
   category    String     // operasional | maintenance | utility | salary | lease
   rabBudgetId String?    // Link ke anggaran RAB
   rabBudget   RabBudget? @relation(fields: [rabBudgetId], references: [id])
+  updatedAt   DateTime   @updatedAt @default(now())
 
   @@index([category])
   @@index([date])
@@ -228,6 +274,7 @@ model RabBudget {
   allocatedAmount Float
   spentAmount     Float
   transactions    AccountingTransaction[]
+  updatedAt       DateTime               @updatedAt @default(now())
 
   @@map("rab_budgets")
 }
@@ -257,6 +304,7 @@ model WorkOrder {
   rejectedBy     String?
   rejectedAt     DateTime?
   rejectedReason String?   @db.Text
+  photos         String[]  @default([]) // URLs of uploaded photos
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -355,4 +403,20 @@ model MasterData {
   @@unique([category, code])
   @@index([category])
   @@map("master_data")
+}
+
+// ────────────────────────────────────────────────────────
+// APP SETTINGS — Konfigurasi Sistem (menggantikan hardcoded)
+// ────────────────────────────────────────────────────────
+
+model AppSetting {
+  key         String   @id
+  value       String
+  label       String   // Label untuk tampilan UI
+  group       String   // smtp | notification | company | system
+  inputType   String   @default("text") // text | number | password | email
+  updatedAt   DateTime @updatedAt
+
+  @@index([group])
+  @@map("app_settings")
 }

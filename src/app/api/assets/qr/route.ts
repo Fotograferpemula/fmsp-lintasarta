@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { withAuth, JWTPayload, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { generateAssetQRCode, generateAssetQRSvg } from '@/lib/qr-service';
+import { handleApiError } from '@/lib/api-error';
 
 // GET /api/assets/qr?id=<assetId>&format=png|svg
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
@@ -51,7 +52,7 @@ async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return handleApiError(error, 'API');
   }
 }
 

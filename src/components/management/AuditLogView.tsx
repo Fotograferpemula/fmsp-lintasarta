@@ -8,10 +8,10 @@ interface AuditLogItem {
 
 export default function AuditLogView({ isDark, token }: { isDark: boolean; token: string }) {
   const c_card = isDark ? 'bg-zinc-900/30 border-zinc-800/80' : 'bg-white border-zinc-200 shadow-sm';
-  const c_input = isDark ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
+  const c_input = isDark ? 'bg-[#1B1F26] border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
   const c_text = isDark ? 'text-white' : 'text-zinc-800';
   const c_sub = isDark ? 'text-zinc-400' : 'text-zinc-500';
-  const c_tbl_h = isDark ? 'bg-zinc-950/40 text-zinc-400' : 'bg-zinc-100 text-zinc-600';
+  const c_tbl_h = isDark ? 'bg-[#1B1F26]/40 text-zinc-400' : 'bg-zinc-100 text-zinc-600';
   const c_tbl_r = isDark ? 'hover:bg-zinc-900/10 border-zinc-800/60' : 'hover:bg-zinc-50 border-zinc-200';
 
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -73,7 +73,7 @@ export default function AuditLogView({ isDark, token }: { isDark: boolean; token
             <th className="px-4 py-3 text-left font-semibold">Detail</th>
           </tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={5} className="text-center py-8"><RefreshCw className="w-5 h-5 mx-auto animate-spin text-[#1769FF]" /></td></tr> :
+            {loading ? <tr><td colSpan={5} className="text-center py-8"><RefreshCw className="w-5 h-5 mx-auto animate-spin text-[#3370FF]" /></td></tr> :
             logs.length === 0 ? <tr><td colSpan={5} className={`text-center py-8 ${c_sub}`}>Tidak ada log.</td></tr> :
             logs.map(log => (
               <tr key={log.id} className={`border-t ${c_tbl_r}`}>

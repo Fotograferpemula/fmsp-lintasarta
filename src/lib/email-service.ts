@@ -120,14 +120,18 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
         <div style="padding: 24px 32px; color: #374151;">
           <h2 style="font-size: 16px; margin: 0 0 12px; color: #111827;">${safeSubject}</h2>
           <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">${safeMessage}</p>
-          ${options.documentLink ? `
+          ${(() => {
+            // SECURITY: Sanitize documentLink — only allow safe relative paths
+            const safeLink = options.documentLink && /^\/[\w\-\/\.\?\=\&\%]+$/.test(options.documentLink)
+              ? escapeHtml(options.documentLink) : null;
+            return safeLink ? `
             <div style="margin-top: 20px;">
-              <a href="${appBaseUrl}${options.documentLink}" 
+              <a href="${appBaseUrl}${safeLink}" 
                  style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-size: 13px; font-weight: 600;">
                 📄 Lihat Detail Dokumen
               </a>
-            </div>
-          ` : ''}
+            </div>` : '';
+          })()}
         </div>
         <div style="padding: 16px 32px; background: #f9fafb; border-top: 1px solid #e5e7eb;">
           <p style="margin: 0; font-size: 11px; color: #9ca3af;">

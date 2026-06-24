@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, PieChart, Landmark, Percent } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, PieChart, Landmark, Percent, HelpCircle } from 'lucide-react';
 
 interface RabBudget {
   id: string;
@@ -10,6 +10,7 @@ interface RabBudget {
   category: string;
   allocatedAmount: number;
   spentAmount: number;
+  computedSpent?: number; // Auto-calculated from linked transactions
 }
 
 interface RabViewProps {
@@ -36,9 +37,9 @@ export default function RabView({ isDark, token }: RabViewProps) {
   });
 
   const c_card = isDark ? 'bg-zinc-900/30 border-zinc-800/80 text-white' : 'bg-white border-zinc-200 text-zinc-800 shadow-sm';
-  const c_table_hdr = isDark ? 'bg-zinc-950/40 border-zinc-800/80 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-600';
+  const c_table_hdr = isDark ? 'bg-[#1B1F26]/40 border-zinc-800/80 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-600';
   const c_table_row = isDark ? 'hover:bg-zinc-900/10 border-zinc-800/60' : 'hover:bg-zinc-100/50 border-zinc-200';
-  const c_input = isDark ? 'bg-zinc-950 border-zinc-800 text-white focus:border-[#1769FF]' : 'bg-white border-zinc-200 text-zinc-800 focus:border-[#1769FF]';
+  const c_input = isDark ? 'bg-[#1B1F26] border-zinc-800 text-white focus:border-[#3370FF]' : 'bg-white border-zinc-200 text-zinc-800 focus:border-[#3370FF]';
   const c_modal = isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
   const c_text_title = isDark ? 'text-white' : 'text-zinc-800';
   const c_text_sub = isDark ? 'text-zinc-400' : 'text-zinc-500';
@@ -141,9 +142,9 @@ export default function RabView({ isDark, token }: RabViewProps) {
     return matchesSearch && matchesYear;
   });
 
-  // Calculate statistics
+  // Calculate statistics — use computedSpent when available
   const totalAllocated = budgets.reduce((acc, curr) => acc + curr.allocatedAmount, 0);
-  const totalSpent = budgets.reduce((acc, curr) => acc + curr.spentAmount, 0);
+  const totalSpent = budgets.reduce((acc, curr) => acc + (curr.computedSpent ?? curr.spentAmount), 0);
   const totalRemaining = totalAllocated - totalSpent;
   const averageUtilization = totalAllocated ? Math.round((totalSpent / totalAllocated) * 100) : 0;
 
@@ -158,22 +159,22 @@ export default function RabView({ isDark, token }: RabViewProps) {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Total Alokasi Anggaran</span>
-          <h2 className="text-3xl font-extrabold mt-2 text-[#1769FF]">{formatRupiah(totalAllocated)}</h2>
+          <h2 className="text-3xl font-extrabold mt-2 text-[#3370FF]">{formatRupiah(totalAllocated)}</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Plafond RAB yang disetujui</p>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Total Penyerapan (Spent)</span>
           <h2 className="text-3xl font-extrabold mt-2 text-red-500">{formatRupiah(totalSpent)}</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Anggaran yang telah terpakai</p>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Sisa Alokasi (Remaining)</span>
           <h2 className="text-3xl font-extrabold mt-2 text-emerald-500">{formatRupiah(totalRemaining)}</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Sisa dana yang belum terpakai</p>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Rata-rata Penyerapan</span>
           <h2 className="text-3xl font-extrabold mt-2 text-indigo-500">{averageUtilization}%</h2>
           <p className="text-[10px] text-zinc-500 mt-1">Efisiensi penggunaan dana</p>
@@ -181,7 +182,7 @@ export default function RabView({ isDark, token }: RabViewProps) {
       </div>
 
       {/* Control Bar */}
-      <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-2xl ${c_card}`}>
+      <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-xl ${c_card}`}>
         <div className="relative w-full sm:max-w-xs">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
             <Search className="w-4 h-4" />
@@ -207,7 +208,7 @@ export default function RabView({ isDark, token }: RabViewProps) {
 
           <button 
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold shadow-md transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             Tambah Plafon RAB
@@ -216,7 +217,7 @@ export default function RabView({ isDark, token }: RabViewProps) {
       </div>
 
       {/* Budgets Table */}
-      <div className={`border rounded-2xl overflow-hidden ${c_card}`}>
+      <div className={`border rounded-xl overflow-hidden ${c_card}`}>
         {loading ? (
           <div className="p-12 text-center text-zinc-500">Loading data alokasi RAB...</div>
         ) : filtered.length === 0 ? (
@@ -238,14 +239,16 @@ export default function RabView({ isDark, token }: RabViewProps) {
               </thead>
               <tbody className="divide-y text-xs">
                 {filtered.map(b => {
-                  const utilization = b.allocatedAmount ? Math.round((b.spentAmount / b.allocatedAmount) * 100) : 0;
-                  const remaining = b.allocatedAmount - b.spentAmount;
+                  const actualSpent = b.computedSpent ?? b.spentAmount;
+                  const utilization = b.allocatedAmount ? Math.round((actualSpent / b.allocatedAmount) * 100) : 0;
+                  const remaining = b.allocatedAmount - actualSpent;
+                  const isOverbudget = remaining < 0;
 
                   return (
                     <tr key={b.id} className={`transition-colors border-b ${c_table_row}`}>
                       <td className="py-4 px-6 font-semibold">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#0D4FCC]/10 flex items-center justify-center text-[#1769FF]">
+                          <div className="w-8 h-8 rounded-full bg-[#245BDB]/10 flex items-center justify-center text-[#3370FF]">
                             <Landmark className="w-4 h-4" />
                           </div>
                           <div>
@@ -260,8 +263,22 @@ export default function RabView({ isDark, token }: RabViewProps) {
                         </span>
                       </td>
                       <td className="py-4 px-6 font-mono font-semibold">{formatRupiah(b.allocatedAmount)}</td>
-                      <td className="py-4 px-6 font-mono font-semibold text-red-500">{formatRupiah(b.spentAmount)}</td>
-                      <td className="py-4 px-6 font-mono font-semibold text-emerald-500">{formatRupiah(remaining)}</td>
+                      <td className="py-4 px-6">
+                        <div>
+                          <span className="font-mono font-semibold text-red-500">{formatRupiah(actualSpent)}</span>
+                          {b.computedSpent !== undefined && b.computedSpent > 0 && (
+                            <span className={`block text-[9px] mt-0.5 ${c_text_sub}`}>dari transaksi</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`font-mono font-semibold ${isOverbudget ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
+                          {formatRupiah(remaining)}
+                        </span>
+                        {isOverbudget && (
+                          <span className="block text-[9px] text-red-400 font-bold">⚠ OVERBUDGET</span>
+                        )}
+                      </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3 w-32">
                           <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -279,7 +296,7 @@ export default function RabView({ isDark, token }: RabViewProps) {
                         <div className="flex justify-end gap-2">
                           <button 
                             onClick={() => openEditModal(b)}
-                            className={`p-1.5 border rounded-lg hover:text-[#1769FF] ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}
+                            className={`p-1.5 border rounded-lg hover:text-[#3370FF] ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}
                             title="Edit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -305,9 +322,19 @@ export default function RabView({ isDark, token }: RabViewProps) {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-md border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">{editingBudget ? 'Perbarui Pos RAB' : 'Tambah Alokasi Plafon RAB'}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">{editingBudget ? 'Perbarui Pos RAB' : 'Tambah Alokasi Plafon RAB'}</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'rab_add' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
 
@@ -375,7 +402,7 @@ export default function RabView({ isDark, token }: RabViewProps) {
                 </div>
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold transition-colors mt-4">
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold transition-colors mt-4">
                 {editingBudget ? 'Simpan Perubahan' : 'Alokasikan Anggaran'}
               </button>
             </form>

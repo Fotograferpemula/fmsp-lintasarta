@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Shield, Calendar, Phone, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Shield, Calendar, Phone, AlertTriangle, HelpCircle } from 'lucide-react';
 
 interface SecurityGuard {
   id: string;
@@ -40,9 +40,9 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
   });
 
   const c_card = isDark ? 'bg-zinc-900/30 border-zinc-800/80 text-white' : 'bg-white border-zinc-200 text-zinc-800 shadow-sm';
-  const c_table_hdr = isDark ? 'bg-zinc-950/40 border-zinc-800/80 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-600';
+  const c_table_hdr = isDark ? 'bg-[#1B1F26]/40 border-zinc-800/80 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-600';
   const c_table_row = isDark ? 'hover:bg-zinc-900/10 border-zinc-800/60' : 'hover:bg-zinc-100/50 border-zinc-200';
-  const c_input = isDark ? 'bg-zinc-950 border-zinc-800 text-white focus:border-[#1769FF]' : 'bg-white border-zinc-200 text-zinc-800 focus:border-[#1769FF]';
+  const c_input = isDark ? 'bg-[#1B1F26] border-zinc-800 text-white focus:border-[#3370FF]' : 'bg-white border-zinc-200 text-zinc-800 focus:border-[#3370FF]';
   const c_modal = isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-800';
   const c_text_title = isDark ? 'text-white' : 'text-zinc-800';
   const c_text_sub = isDark ? 'text-zinc-400' : 'text-zinc-500';
@@ -120,21 +120,21 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Total Personil</span>
           <h2 className="text-3xl font-extrabold mt-2">{totalGuards} Orang</h2>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>Aktif Bertugas</span>
           <h2 className="text-3xl font-extrabold mt-2 text-emerald-500">{activeGuards} Orang</h2>
         </div>
-        <div className={`p-6 rounded-2xl border ${c_card}`}>
+        <div className={`p-6 rounded-xl border ${c_card}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${c_text_sub}`}>KTA Expired</span>
           <h2 className="text-3xl font-extrabold mt-2 text-red-500">{expiredKta} Orang</h2>
         </div>
       </div>
 
-      <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-2xl ${c_card}`}>
+      <div className={`flex flex-col sm:flex-row gap-4 items-center justify-between p-4 border rounded-xl ${c_card}`}>
         <div className="relative w-full sm:max-w-xs">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500"><Search className="w-4 h-4" /></span>
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama / NIP..." className={`w-full pl-9 pr-4 py-2 border rounded-xl text-xs outline-none ${c_input}`} />
@@ -146,13 +146,13 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
             <option value="madya">Gada Madya</option>
             <option value="utama">Gada Utama</option>
           </select>
-          <button onClick={openAddModal} className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-xl text-xs font-semibold shadow-md">
+          <button onClick={openAddModal} className="flex items-center gap-1.5 px-4 py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-xl text-xs font-semibold shadow-md">
             <Plus className="w-4 h-4" /> Tambah Guard
           </button>
         </div>
       </div>
 
-      <div className={`border rounded-2xl overflow-hidden ${c_card}`}>
+      <div className={`border rounded-xl overflow-hidden ${c_card}`}>
         {loading ? (
           <div className="p-12 text-center text-zinc-500">Loading data security...</div>
         ) : filtered.length === 0 ? (
@@ -184,7 +184,7 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
                     </td>
                     <td className="py-4 px-6 text-zinc-500"><div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{g.phone}</div></td>
                     <td className="py-4 px-6">
-                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase ${g.gadaLevel === 'utama' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : g.gadaLevel === 'madya' ? 'bg-[#1769FF]/10 text-[#1769FF] border border-blue-500/20' : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'}`}>
+                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase ${g.gadaLevel === 'utama' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : g.gadaLevel === 'madya' ? 'bg-[#3370FF]/10 text-[#3370FF] border border-blue-500/20' : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'}`}>
                         Gada {g.gadaLevel || '-'}
                       </span>
                     </td>
@@ -206,7 +206,7 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => openEditModal(g)} className={`p-1.5 border rounded-lg hover:text-[#1769FF] ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => openEditModal(g)} className={`p-1.5 border rounded-lg hover:text-[#3370FF] ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(g.id)} className={`p-1.5 border rounded-lg hover:text-red-500 ${isDark ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
@@ -220,9 +220,19 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-md border p-6 rounded-2xl shadow-2xl space-y-6 ${c_modal}`}>
+          <div className={`w-full max-w-md border p-6 rounded-xl shadow-2xl space-y-6 ${c_modal}`}>
             <div className={`flex items-center justify-between border-b pb-3 ${c_border}`}>
-              <h3 className="text-base font-bold">{editingGuard ? 'Perbarui Data Security' : 'Tambah Anggota Security'}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold">{editingGuard ? 'Perbarui Data Security' : 'Tambah Anggota Security'}</h3>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-help', { detail: { key: 'hrd_add' } }))}
+                  className="p-1 rounded-lg hover:bg-zinc-500/10 text-[#3370FF] hover:text-[#5B8EFF] transition-all"
+                  title="Lihat Bantuan Form"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-red-500 text-xs">Tutup</button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
@@ -278,7 +288,7 @@ export default function SecurityView({ isDark, token }: SecurityViewProps) {
                 <label className="block text-zinc-500 mb-1">Tanggal Bergabung</label>
                 <input type="date" required value={formData.joinDate} onChange={(e) => setFormData({ ...formData, joinDate: e.target.value })} className={`w-full px-3 py-2 border rounded-lg outline-none ${c_input}`} />
               </div>
-              <button type="submit" className="w-full py-2.5 bg-[#1769FF] hover:bg-[#4A8AFF] text-white rounded-lg font-semibold">{editingGuard ? 'Simpan Perubahan' : 'Tambah Anggota'}</button>
+              <button type="submit" className="w-full py-2.5 bg-[#3370FF] hover:bg-[#5B8EFF] text-white rounded-lg font-semibold">{editingGuard ? 'Simpan Perubahan' : 'Tambah Anggota'}</button>
             </form>
           </div>
         </div>

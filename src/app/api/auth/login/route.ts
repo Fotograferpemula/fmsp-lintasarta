@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
-import { generateToken } from '@/lib/auth-middleware';
+import { generateToken, extractClientIp } from '@/lib/auth-middleware';
 import { LoginSchema, validateRequest } from '@/lib/validators';
 import { getRoleConfig } from '@/lib/rbac';
 
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 export async function POST(req: Request) {
+  const clientIp = extractClientIp(req);
   try {
     const body = await req.json();
     
@@ -26,13 +30,13 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      // Log failed attempt
       await prisma.auditLog.create({
         data: {
           user: email,
           action: 'LOGIN_FAILED',
           resource: 'Auth',
           details: `Login gagal: akun ${email} tidak ditemukan.`,
+          ip: clientIp,
         },
       });
       return NextResponse.json(
@@ -49,21 +53,71 @@ export async function POST(req: Request) {
       );
     }
 
+    // ── Account Lockout Check ──
+    if (user.lockedUntil) {
+      const now = new Date();
+      if (user.lockedUntil > now) {
+        const remainingMs = user.lockedUntil.getTime() - now.getTime();
+        const remainingMin = Math.ceil(remainingMs / 60000);
+        return NextResponse.json(
+          { success: false, error: `Akun terkunci karena ${MAX_FAILED_ATTEMPTS}x percobaan gagal. Coba lagi dalam ${remainingMin} menit.` },
+          { status: 429 }
+        );
+      }
+      // Lockout expired — reset counter
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null, lastFailedLogin: null },
+      });
+      user.failedLoginAttempts = 0;
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      const newAttempts = user.failedLoginAttempts + 1;
+      const shouldLock = newAttempts >= MAX_FAILED_ATTEMPTS;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: newAttempts,
+          lastFailedLogin: new Date(),
+          lockedUntil: shouldLock ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null,
+        },
+      });
+
       await prisma.auditLog.create({
         data: {
           user: email,
-          action: 'LOGIN_FAILED',
+          action: shouldLock ? 'ACCOUNT_LOCKED' : 'LOGIN_FAILED',
           resource: 'Auth',
-          details: `Login gagal: password salah untuk akun ${email}.`,
+          details: shouldLock
+            ? `Akun ${email} DIKUNCI selama 15 menit (${newAttempts}x gagal login).`
+            : `Login gagal: password salah untuk ${email} (percobaan ke-${newAttempts}/${MAX_FAILED_ATTEMPTS}).`,
+          ip: clientIp,
         },
       });
+
+      if (shouldLock) {
+        return NextResponse.json(
+          { success: false, error: `Akun terkunci selama 15 menit karena ${MAX_FAILED_ATTEMPTS}x percobaan gagal.` },
+          { status: 429 }
+        );
+      }
+
       return NextResponse.json(
-        { success: false, error: 'Email atau password salah.' },
+        { success: false, error: `Email atau password salah. (${newAttempts}/${MAX_FAILED_ATTEMPTS} percobaan)` },
         { status: 401 }
       );
+    }
+
+    // ── Login Success — reset lockout counter ──
+    if (user.failedLoginAttempts > 0) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null, lastFailedLogin: null },
+      });
     }
 
     // Generate JWT (include region for scoped access)
@@ -82,6 +136,7 @@ export async function POST(req: Request) {
         action: 'LOGIN_SUCCESS',
         resource: 'Auth',
         details: `User ${user.name} (${user.role}) berhasil login.`,
+        ip: clientIp,
       },
     });
 
@@ -97,6 +152,7 @@ export async function POST(req: Request) {
           role: user.role,
           region: user.region,
           roleLabel: getRoleConfig(user.role).label,
+          mustChangePassword: user.mustChangePassword || false,
         },
       },
     });

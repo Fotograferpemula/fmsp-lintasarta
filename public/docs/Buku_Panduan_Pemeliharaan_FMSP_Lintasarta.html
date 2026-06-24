@@ -221,7 +221,8 @@
             <li><strong>5. Manajemen Database</strong></li>
             <li style="padding-left: 20px;">5.1 Skema Database (22 Tabel)</li>
             <li style="padding-left: 20px;">5.2 Prisma Migrate & Client Generation</li>
-            <li style="padding-left: 20px;">5.3 Seeding Data Awal</li>
+            <li style="padding-left: 20px;">5.3 Seeding Data Awal (4 Regional)</li>
+            <li style="padding-left: 20px;">5.4 Model Data Regional (4 Wilayah)</li>
             <li><strong>6. Prosedur Backup & Restore</strong></li>
             <li style="padding-left: 20px;">6.1 Manual Backup (pg_dump)</li>
             <li style="padding-left: 20px;">6.2 Manual Restore (pg_restore)</li>
@@ -488,14 +489,43 @@ npx prisma db push --accept-data-loss</pre>
             <strong>⚠️ Perhatian:</strong> <code>--accept-data-loss</code> pada db push bisa menghapus data jika ada kolom yang dihapus. Selalu backup database sebelum migrasi di produksi!
         </div>
 
-        <h2>5.3 Seeding Data Awal</h2>
-        <p>Script <code>prisma/seed.ts</code> membuat data awal yang diperlukan:</p>
+        <h2>5.3 Seeding Data Awal (4 Regional)</h2>
+        <p>Script <code>prisma/seed.ts</code> membuat data awal yang diperlukan, terstruktur dalam <strong>4 regional</strong>:</p>
         <ul>
-            <li>Akun SuperAdmin default (email dari .env)</li>
-            <li>Master Data untuk semua dropdown kategori</li>
-            <li>AppSettings default (SMTP config, company info, AI bot status)</li>
+            <li><strong>12 Akun User:</strong> 3 akun pusat (SuperAdmin, Manager FMS, Admin Pusat) + 3 akun admin regional (Medan, Bandung, Surabaya) + 3 admin lokasi + 3 user operasional</li>
+            <li><strong>12 Aset Fisik:</strong> Masing-masing 3 aset per regional (Gedung, Genset, AC), lokasi mengandung nama kota regional</li>
+            <li><strong>12 Dokumen Legalitas:</strong> SLF, PBG, Asuransi per regional, dengan variasi status (Valid, Warning, Expired)</li>
+            <li><strong>12 Item Inventory:</strong> Sparepart per gudang regional, SKU prefix (BDG, MDN, SBY, JKT)</li>
+            <li><strong>Master Data 9 Kategori:</strong> Termasuk kategori "region" (4 item: Jakarta, Medan, Bandung, Surabaya)</li>
+            <li><strong>AppSettings:</strong> SMTP config, company info, AI bot config</li>
         </ul>
         <pre>npx prisma db seed</pre>
+
+        <h2>5.4 Model Data Regional (4 Wilayah)</h2>
+        <p>FMSP menerapkan <strong>data partitioning berbasis string matching</strong> untuk memisahkan data antar regional. Implementasi teknis:</p>
+
+        <h3>File: <code>src/lib/region-filter.ts</code></h3>
+        <p>Fungsi <code>getRegionFilter()</code> menghasilkan Prisma <code>WHERE</code> clause berdasarkan role dan region user yang login:</p>
+        <pre>// Logika utama:
+// 1. SuperAdmin/Manager/Admin Pusat → return {} (tanpa filter, lihat semua)
+// 2. Admin Regional/Lokasi/User → return { location: { contains: userRegion } }
+
+// Region string yang digunakan (clean, tanpa delimiter):
+// "Medan", "Bandung", "Surabaya", "Jakarta"</pre>
+
+        <h3>Konvensi Penamaan Regional</h3>
+        <table>
+            <thead><tr><th>Regional</th><th>Kode Prefix</th><th>Contoh Lokasi</th><th>Contoh SKU</th></tr></thead>
+            <tbody>
+                <tr><td>Jakarta</td><td>JKT</td><td>Kantor Pusat Jakarta</td><td>JKT-FILT-AHU-01</td></tr>
+                <tr><td>Medan</td><td>MDN</td><td>Jl. Gatot Subroto, Medan</td><td>MDN-APAR-CO2-01</td></tr>
+                <tr><td>Bandung</td><td>BDG</td><td>Jatiluhur — Regional Bandung</td><td>BDG-EL-KABEL-01</td></tr>
+                <tr><td>Surabaya</td><td>SBY</td><td>Kantor Surabaya, Gedung Lt. 2</td><td>SBY-HVAC-FREON-01</td></tr>
+            </tbody>
+        </table>
+        <div class="warn-box">
+            <strong>⚠️ KRITIS:</strong> Field <code>location</code> pada semua tabel (assets, inventory_items, employees, smk3_items) <strong>HARUS</strong> mengandung nama kota regional agar filter otomatis bekerja. Tanpa ini, admin regional tidak akan melihat data tersebut.
+        </div>
     </div>
 
     <!-- CHAPTER 6 -->

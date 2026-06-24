@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateCronAuth } from '@/lib/cron-auth';
 import { runMaintenanceJob } from '@/lib/cron-scheduler';
+import { handleApiError } from '@/lib/api-error';
 
 // GET /api/cron/maintenance
 // Cek jadwal maintenance overdue dan kirim reminder
@@ -23,6 +24,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[CRON MAINTENANCE API ERROR]', error.message);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return handleApiError(error, 'API');
   }
 }

@@ -1,68 +1,93 @@
-import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { withAuth, JWTPayload, AuthenticatedRequest } from '@/lib/auth-middleware';
-import { withRBAC } from '@/lib/rbac-middleware';
+import { NextResponse } from "next/server";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
+import crypto from "crypto";
+import { prisma } from "@/lib/db";
+import {
+  withAuth,
+  JWTPayload,
+  AuthenticatedRequest,
+  extractClientIp,
+} from "@/lib/auth-middleware";
+import { withPermission } from "@/lib/rbac-middleware";
+import { validateUploadedFile, sanitizeFilename } from "@/lib/file-validator";
 
-const RESOURCE = 'upload';
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'docs');
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB sesuai SRS FR-04
-const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+const RESOURCE = "upload";
+const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "docs");
 
 async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
   try {
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
+    const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ success: false, error: 'File tidak ditemukan.' }, { status: 400 });
-    }
-
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { success: false, error: `Tipe file tidak didukung: ${file.type}. Hanya PDF, PNG, JPG.` },
-        { status: 400 }
+        { success: false, error: "File tidak ditemukan." },
+        { status: 400 },
       );
     }
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
+    // SECURITY: Comprehensive file validation (magic bytes, extension, size)
+    const validationError = await validateUploadedFile(file);
+    if (validationError) {
       return NextResponse.json(
-        { success: false, error: `Ukuran file melebihi batas 10MB (${(file.size / 1024 / 1024).toFixed(1)}MB).` },
-        { status: 400 }
+        { success: false, error: validationError },
+        { status: 400 },
       );
     }
 
-    // Generate unique filename
-    const ext = path.extname(file.name) || (file.type === 'application/pdf' ? '.pdf' : '.jpg');
-    const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}${ext}`;
+    // SECURITY: Generate cryptographically random filename (prevent guessing)
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    const uniqueName = `${crypto.randomUUID()}${ext}`;
+
+    // Sanitize original filename for logging (prevent log injection)
+    const safeOriginalName = sanitizeFilename(file.name);
 
     // Ensure upload directory exists
     await mkdir(UPLOAD_DIR, { recursive: true });
 
+    // SECURITY: Verify the final path is within UPLOAD_DIR (prevent path traversal)
+    const filePath = path.join(UPLOAD_DIR, uniqueName);
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(path.resolve(UPLOAD_DIR))) {
+      return NextResponse.json(
+        { success: false, error: "Path file tidak valid." },
+        { status: 400 },
+      );
+    }
+
     // Write file
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const filePath = path.join(UPLOAD_DIR, uniqueName);
-    await writeFile(filePath, buffer);
+    await writeFile(resolvedPath, buffer);
 
     const url = `/uploads/docs/${uniqueName}`;
+
+    await prisma.auditLog.create({
+      data: {
+        user: user.email,
+        action: "UPLOAD_FILE",
+        resource: "Upload",
+        details: `File "${safeOriginalName}" (${(file.size / 1024).toFixed(1)}KB) diupload sebagai "${uniqueName}".`,
+        ip: req.clientIp || extractClientIp(req),
+      },
+    });
 
     return NextResponse.json({
       success: true,
       data: {
         url,
         filename: uniqueName,
-        originalName: file.name,
+        originalName: safeOriginalName,
         size: file.size,
-        type: file.type,
       },
     });
-  } catch (error: any) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Terjadi kesalahan saat mengupload file." },
+      { status: 500 },
+    );
   }
 }
 
-export const POST = withAuth(withRBAC(handlePost, RESOURCE));
+export const POST = withAuth(withPermission("upload", handlePost));
