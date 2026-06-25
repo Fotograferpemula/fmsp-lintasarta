@@ -14,25 +14,39 @@ import {
 } from "@/lib/validators";
 import { getRegionFilter } from "@/lib/region-filter";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "assets";
 
 // GET: Ambil semua aset
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
     const regionWhere = getRegionFilter(user);
-    const assets = await prisma.asset.findMany({
-      where: regionWhere,
-      include: {
-        transfers: {
-          orderBy: { transferredAt: "desc" },
-        },
-        legalDocuments: true,
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+    const where = { ...regionWhere, deletedAt: null };
 
-    return NextResponse.json({ success: true, data: assets });
+    const [assets, total] = await Promise.all([
+      prisma.asset.findMany({
+        where,
+        include: {
+          transfers: {
+            orderBy: { transferredAt: "desc" },
+          },
+          legalDocuments: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.asset.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: assets,
+      pagination: paginationMeta(total, page, limit),
+    });
   } catch (error: any) {
     console.error("Error fetching assets:", error);
     return handleApiError(error, "API");
@@ -65,30 +79,34 @@ async function handlePost(req: AuthenticatedRequest, user: JWTPayload) {
       photos,
     } = validation.data;
 
-    const asset = await prisma.asset.create({
-      data: {
-        name,
-        type,
-        location,
-        specs: specs || {},
-        bookValue,
-        status,
-        purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
-        purchaseCost: purchaseCost !== undefined ? purchaseCost : null,
-        expectedLifeYrs: expectedLifeYrs !== undefined ? expectedLifeYrs : null,
-        lifecycleStatus: lifecycleStatus || "operational",
-        photos: Array.isArray(photos) ? photos : [],
-      },
-    });
+    const asset = await prisma.$transaction(async (tx) => {
+      const created = await tx.asset.create({
+        data: {
+          name,
+          type,
+          location,
+          specs: specs || {},
+          bookValue,
+          status,
+          purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+          purchaseCost: purchaseCost !== undefined ? purchaseCost : null,
+          expectedLifeYrs: expectedLifeYrs !== undefined ? expectedLifeYrs : null,
+          lifecycleStatus: lifecycleStatus || "operational",
+          photos: Array.isArray(photos) ? photos : [],
+        },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        user: user.email,
-        action: "CREATE_ASSET",
-        resource: "Asset",
-        details: `Aset "${name}" (${type}) ditambahkan di lokasi ${location}.`,
-        ip: req.clientIp || "0.0.0.0",
-      },
+      await tx.auditLog.create({
+        data: {
+          user: user.email,
+          action: "CREATE_ASSET",
+          resource: "Asset",
+          details: `Aset "${name}" (${type}) ditambahkan di lokasi ${location}.`,
+          ip: req.clientIp || "0.0.0.0",
+        },
+      });
+
+      return created;
     });
 
     return NextResponse.json({ success: true, data: asset });
@@ -165,17 +183,17 @@ async function handlePut(req: AuthenticatedRequest, user: JWTPayload) {
         });
       }
 
-      return updatedAsset;
-    });
+      await tx.auditLog.create({
+        data: {
+          user: user.email,
+          action: "UPDATE_ASSET",
+          resource: "Asset",
+          details: `Aset "${updatedAsset.name}" diperbarui oleh ${user.name}.`,
+          ip: req.clientIp || "0.0.0.0",
+        },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        user: user.email,
-        action: "UPDATE_ASSET",
-        resource: "Asset",
-        details: `Aset "${result.name}" diperbarui oleh ${user.name}.`,
-        ip: req.clientIp || "0.0.0.0",
-      },
+      return updatedAsset;
     });
 
     return NextResponse.json({ success: true, data: result });
@@ -207,17 +225,22 @@ async function handleDelete(req: AuthenticatedRequest, user: JWTPayload) {
       );
     }
 
-    // Cascade delete (transfers + legal docs deleted via onDelete: Cascade)
-    await prisma.asset.delete({ where: { id } });
+    // Soft delete — data tetap tersimpan untuk keperluan audit historis
+    await prisma.$transaction(async (tx) => {
+      await tx.asset.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        user: user.email,
-        action: "DELETE_ASSET",
-        resource: "Asset",
-        details: `Aset "${asset.name}" (${asset.type}) di ${asset.location} telah dihapus oleh ${user.name}.`,
-        ip: req.clientIp || "0.0.0.0",
-      },
+      await tx.auditLog.create({
+        data: {
+          user: user.email,
+          action: "DELETE_ASSET",
+          resource: "Asset",
+          details: `Aset "${asset.name}" (${asset.type}) di ${asset.location} telah dihapus (soft) oleh ${user.name}.`,
+          ip: req.clientIp || "0.0.0.0",
+        },
+      });
     });
 
     return NextResponse.json({

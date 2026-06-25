@@ -60,6 +60,7 @@ import RabView from '@/components/management/RabView';
 import MaintenanceView from '@/components/management/MaintenanceView';
 import VendorView from '@/components/management/VendorView';
 import WorkOrderView from '@/components/management/WorkOrderView';
+import WoApprovalView from '@/components/management/WoApprovalView';
 import AuditLogView from '@/components/management/AuditLogView';
 import AdminView from '@/components/management/AdminView';
 import UserManagementView from '@/components/management/UserManagementView';
@@ -140,7 +141,7 @@ export default function Home() {
   const isDark = theme === 'dark';
 
   // State Utama Aplikasi
-  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'auditlog' | 'admin' | 'users' | 'analytics' | 'aiconfig' | 'docs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'notifications' | 'hrd' | 'inventory' | 'smk3' | 'accounting' | 'maintenance' | 'vendor' | 'workorder' | 'approval' | 'auditlog' | 'admin' | 'users' | 'analytics' | 'aiconfig' | 'docs'>('overview');
   // Sub-tab states for consolidated menus
   const [assetSubTab, setAssetSubTab] = useState<'aset' | 'legal'>('aset');
   const [hrdSubTab, setHrdSubTab] = useState<'karyawan' | 'security'>('karyawan');
@@ -990,7 +991,7 @@ export default function Home() {
                 <button
                   onClick={() => setPhase2Open(!phase2Open)}
                   className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    ['hrd', 'accounting', 'workorder', 'aiconfig'].includes(activeTab)
+                    ['hrd', 'accounting', 'workorder', 'approval', 'aiconfig'].includes(activeTab)
                       ? 'bg-[#3370FF]/10 text-[#5B8EFF] border border-[#3370FF]/20'
                       : isDark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'text-zinc-500 hover:text-zinc-800 hover:bg-[#3370FF]/5'
                   }`}
@@ -1007,6 +1008,7 @@ export default function Home() {
                       { tab: 'hrd', icon: <Users className="w-3.5 h-3.5" />, label: 'HRD & Security' },
                       { tab: 'accounting', icon: <DollarSign className="w-3.5 h-3.5" />, label: 'Keuangan' },
                       { tab: 'workorder', icon: <ClipboardList className="w-3.5 h-3.5" />, label: 'Work Order / Ticket' },
+                      { tab: 'approval', icon: <CheckCircle2 className="w-3.5 h-3.5" />, label: 'Approval Center' },
                       { tab: 'aiconfig', icon: <Bot className="w-3.5 h-3.5" />, label: 'AI Configuration' },
                     ] as { tab: string; icon: React.ReactNode; label: string }[]).map(({ tab, icon, label }) => (
                       <button key={tab} onClick={() => setActiveTab(tab as any)}
@@ -1132,6 +1134,7 @@ export default function Home() {
             {activeTab === 'maintenance' && 'Preventive Maintenance Schedule'}
             {activeTab === 'vendor' && 'Vendor & Contract Management'}
             {activeTab === 'workorder' && 'Work Order & Ticket Management'}
+            {activeTab === 'approval' && 'Approval & Verification Center'}
             {activeTab === 'auditlog' && 'Audit Log — Catatan Aktivitas'}
             {activeTab === 'admin' && 'Admin — Master Data Management'}
             {activeTab === 'users' && 'Manajemen Pengguna'}
@@ -1967,6 +1970,9 @@ export default function Home() {
 
             {/* ────────── TAB 15: WORK ORDER / TICKET ────────── */}
             {activeTab === 'workorder' && <WorkOrderView isDark={isDark} token={authToken} currentUserRole={currentUser?.role || 'viewer'} />}
+
+            {/* ────────── TAB 15b: APPROVAL CENTER ────────── */}
+            {activeTab === 'approval' && <WoApprovalView isDark={isDark} token={authToken} currentUserRole={currentUser?.role || 'viewer'} currentUserEmail={currentUser?.email || ''} />}
 
             {/* ────────── TAB 16: AUDIT LOG ────────── */}
             {activeTab === 'auditlog' && <AuditLogView isDark={isDark} token={authToken} />}

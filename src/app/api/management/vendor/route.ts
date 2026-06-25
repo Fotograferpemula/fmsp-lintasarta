@@ -8,15 +8,30 @@ import {
 import { withPermission } from "@/lib/rbac-middleware";
 import { VendorContractCreateSchema, validateRequest } from "@/lib/validators";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "management";
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
-    const contracts = await prisma.vendorContract.findMany({
-      orderBy: { endDate: "asc" },
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
+    const where = { deletedAt: null };
+
+    const [contracts, total] = await Promise.all([
+      prisma.vendorContract.findMany({
+        where,
+        orderBy: { endDate: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.vendorContract.count({ where }),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: contracts,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: contracts });
   } catch (error: any) {
     return handleApiError(error, "API");
   }
@@ -129,16 +144,33 @@ async function handleDelete(req: AuthenticatedRequest, user: JWTPayload) {
         { success: false, error: "ID wajib diisi." },
         { status: 400 },
       );
-    await prisma.vendorContract.delete({ where: { id: body.id } });
-    await prisma.auditLog.create({
-      data: {
-        user: user.email,
-        action: "DELETE_VENDOR_CONTRACT",
-        resource: "VendorContract",
-        details: `Kontrak vendor ID ${body.id} dihapus.`,
-        ip: req.clientIp || "0.0.0.0",
-      },
+
+    const contract = await prisma.vendorContract.findUnique({ where: { id: body.id } });
+    if (!contract) {
+      return NextResponse.json(
+        { success: false, error: "Kontrak tidak ditemukan." },
+        { status: 404 },
+      );
+    }
+
+    // Soft delete
+    await prisma.$transaction(async (tx) => {
+      await tx.vendorContract.update({
+        where: { id: body.id },
+        data: { deletedAt: new Date() },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          user: user.email,
+          action: "DELETE_VENDOR_CONTRACT",
+          resource: "VendorContract",
+          details: `Kontrak "${contract.contractTitle}" dengan ${contract.vendorName} dihapus (soft).`,
+          ip: req.clientIp || "0.0.0.0",
+        },
+      });
     });
+
     return NextResponse.json({
       success: true,
       message: "Kontrak vendor berhasil dihapus.",

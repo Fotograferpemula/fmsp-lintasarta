@@ -93,6 +93,9 @@ export type PermissionKey =
   | "wo_approve"
   | "wo_update"
   | "wo_delete"
+  | "wo_verify"
+  | "wo_config"
+  | "wo_escalate"
   // User Management
   | "user_manage"
   // Audit Log
@@ -184,6 +187,9 @@ export const PERMISSIONS: Record<PermissionKey, RoleName[]> = {
   wo_approve: L3,
   wo_update: L3L,
   wo_delete: L2,
+  wo_verify: ALL, // Logic di API cek apakah user = reporter
+  wo_config: L2,  // Kelola approval & SLA config
+  wo_escalate: L3, // Manual escalation
 
   // User Management
   user_manage: L3,

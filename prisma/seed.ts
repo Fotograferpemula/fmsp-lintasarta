@@ -10,6 +10,7 @@ async function main() {
   await prisma.notification.deleteMany({});
   await prisma.legalDocument.deleteMany({});
   await prisma.assetTransfer.deleteMany({});
+  await prisma.workOrderStatusLog.deleteMany({});
   await prisma.workOrder.deleteMany({});
   await prisma.maintenanceSchedule.deleteMany({});
   await prisma.accountingTransaction.deleteMany({});
@@ -21,6 +22,8 @@ async function main() {
   await prisma.asset.deleteMany({});
   await prisma.passwordResetRequest.deleteMany({});
   await prisma.pushSubscription.deleteMany({});
+  await prisma.woApprovalConfig.deleteMany({});
+  await prisma.woSlaConfig.deleteMany({});
   await prisma.user.deleteMany({});
 
   const bcryptHash = '$2b$10$t2QUjXtOojZFB15LQ9Iap.cESbxnmuv0Pj1JgEr7zYAc9Me20vnW6'; // Admin@2026
@@ -49,6 +52,7 @@ async function main() {
       role: 'manager_fms',
       department: 'FM',
       passwordHash: bcryptHash,
+      mustChangePassword: true,
     },
   });
 
@@ -59,6 +63,7 @@ async function main() {
       role: 'admin_pusat',
       department: 'FM',
       passwordHash: bcryptHash,
+      mustChangePassword: true,
     },
   });
 
@@ -848,16 +853,61 @@ async function main() {
   // ────────────────────────────────────────────────────────
   await prisma.workOrder.createMany({
     data: [
-      // Bandung
-      { ticketNumber: 'WO-2026-0001', title: 'AC Presisi Data Hall 1 Jatiluhur Overheat', description: 'Suhu Cold Aisle melebihi 27°C. AC Presisi Unit 3 tidak dingin optimal. Perlu pengecekan refrigerant.', priority: 'critical', category: 'hvac', assetId: assetACBandung.id, assignedTo: 'LA-BDG-001', reportedBy: 'regional.bandung@lintasarta.co.id', status: 'open', slaDeadline: new Date(now.getTime() + 4 * 3600000) },
-      { ticketNumber: 'WO-2026-0002', title: 'Lampu Emergency Exit Lt.2 Mati — Jatiluhur', description: 'Lampu penanda jalur evakuasi lantai 2 sayap barat tidak menyala.', priority: 'high', category: 'electrical', assetId: assetJatiluhur.id, reportedBy: 'teknisi.bandung@lintasarta.co.id', status: 'in_progress', assignedTo: 'LA-BDG-002' },
+      // Bandung — v2 categories
+      { ticketNumber: 'WO-2026-0001', title: 'AC Presisi Data Hall 1 Jatiluhur Overheat', description: 'Suhu Cold Aisle melebihi 27°C. AC Presisi Unit 3 tidak dingin optimal. Perlu pengecekan refrigerant.', priority: 'critical', category: 'cooling', assetId: assetACBandung.id, assignedTo: 'LA-BDG-001', reportedBy: 'regional.bandung@lintasarta.co.id', status: 'in_progress', approvalLevel: 2, approvedL1By: 'regional.bandung@lintasarta.co.id', approvedL1At: new Date(now.getTime() - 2 * 3600000), approvedL2By: 'manager@lintasarta.co.id', approvedL2At: new Date(now.getTime() - 1 * 3600000), slaDeadline: new Date(now.getTime() + 4 * 3600000) },
+      { ticketNumber: 'WO-2026-0002', title: 'Lampu Emergency Exit Lt.2 Mati — Jatiluhur', description: 'Lampu penanda jalur evakuasi lantai 2 sayap barat tidak menyala.', priority: 'high', category: 'power', assetId: assetJatiluhur.id, reportedBy: 'teknisi.bandung@lintasarta.co.id', status: 'assigned', approvalLevel: 1, approvedL1By: 'regional.bandung@lintasarta.co.id', approvedL1At: new Date(now.getTime() - 3600000), assignedTo: 'LA-BDG-002' },
       // Medan
-      { ticketNumber: 'WO-2026-0003', title: 'Kebocoran Pipa Air Toilet Lt.1 Kantor Medan', description: 'Pipa air di toilet pria lantai 1 bocor kecil, sudah ditampung ember.', priority: 'medium', category: 'plumbing', assetId: assetKantorMedan.id, reportedBy: 'teknisi.medan@lintasarta.co.id', status: 'resolved', resolvedAt: new Date(now.getTime() - 2 * 86400000), assignedTo: 'LA-MDN-001' },
+      { ticketNumber: 'WO-2026-0003', title: 'Kebocoran Pipa Air Toilet Lt.1 Kantor Medan', description: 'Pipa air di toilet pria lantai 1 bocor kecil, sudah ditampung ember.', priority: 'medium', category: 'plumbing', assetId: assetKantorMedan.id, reportedBy: 'teknisi.medan@lintasarta.co.id', status: 'resolved', resolvedAt: new Date(now.getTime() - 2 * 86400000), approvalLevel: 1, approvedL1By: 'regional.medan@lintasarta.co.id', approvedL1At: new Date(now.getTime() - 5 * 86400000), assignedTo: 'LA-MDN-001' },
       // Surabaya
-      { ticketNumber: 'WO-2026-0004', title: 'Genset Surabaya Gagal Start Otomatis', description: 'Genset Perkins 500 kVA gagal melakukan auto-start saat PLN trip. Perlu pengecekan ATS panel.', priority: 'high', category: 'electrical', assetId: assetGensetSurabaya.id, reportedBy: 'regional.surabaya@lintasarta.co.id', status: 'open', assignedTo: 'LA-SBY-001' },
+      { ticketNumber: 'WO-2026-0004', title: 'Genset Surabaya Gagal Start Otomatis', description: 'Genset Perkins 500 kVA gagal melakukan auto-start saat PLN trip. Perlu pengecekan ATS panel.', priority: 'high', category: 'power', assetId: assetGensetSurabaya.id, reportedBy: 'regional.surabaya@lintasarta.co.id', status: 'pending_approval', assignedTo: 'LA-SBY-001' },
+      // Draft example
+      { ticketNumber: 'WO-2026-0005', title: 'CCTV Lobby Kantor Medan Offline', description: 'Kamera CCTV di lobby lantai 1 sudah offline sejak kemarin.', priority: 'medium', category: 'security', reportedBy: 'teknisi.medan@lintasarta.co.id', status: 'draft', estimatedCost: 750000 },
     ],
   });
-  console.log('Created 4 Work Orders across 3 regions');
+  console.log('Created 5 Work Orders across 3 regions (v2 statuses)');
+
+  // ────────────────────────────────────────────────────────
+  // 14b. WO APPROVAL CONFIGS — Default per Category
+  // ────────────────────────────────────────────────────────
+  const approvalConfigs = [
+    // DC-critical categories: L2 wajib untuk critical & high
+    { category: 'cooling',    requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical', 'high'] },
+    { category: 'power',      requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical', 'high'] },
+    { category: 'fire_safety', requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical', 'high'] },
+    // Standard categories: L2 only for critical
+    { category: 'plumbing',   requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical'] },
+    { category: 'structural', requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical'] },
+    { category: 'it_infra',   requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical'] },
+    { category: 'security',   requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: true,  l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: ['critical'] },
+    // Low-risk categories: L1 only, auto-approve < Rp 500rb
+    { category: 'general',    requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: false, l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: [], autoApproveBelow: 500000 },
+    { category: 'cleaning',   requireL1: true, l1Roles: ['admin_lokasi', 'admin_regional'], requireL2: false, l2Roles: ['manager_fms', 'admin_pusat'], l2Priorities: [], autoApproveBelow: 500000 },
+  ];
+  for (const cfg of approvalConfigs) {
+    await prisma.woApprovalConfig.create({ data: cfg });
+  }
+  console.log(`Created ${approvalConfigs.length} WO Approval Configs`);
+
+  // ────────────────────────────────────────────────────────
+  // 14c. WO SLA CONFIGS — Default (wildcard) + per priority
+  // ────────────────────────────────────────────────────────
+  const slaConfigs = [
+    // Default SLA (all categories, all regions)
+    { category: '*', region: '*', priority: 'critical', responseMinutes: 15,   resolveMinutes: 240 },   // 15min / 4hr
+    { category: '*', region: '*', priority: 'high',     responseMinutes: 60,   resolveMinutes: 1440 },  // 1hr / 24hr
+    { category: '*', region: '*', priority: 'medium',   responseMinutes: 240,  resolveMinutes: 4320 },  // 4hr / 72hr
+    { category: '*', region: '*', priority: 'low',      responseMinutes: 1440, resolveMinutes: 10080 }, // 24hr / 7 days
+    // Stricter SLA for cooling (Data Center)
+    { category: 'cooling', region: '*', priority: 'critical', responseMinutes: 10,  resolveMinutes: 120 },  // 10min / 2hr
+    { category: 'cooling', region: '*', priority: 'high',     responseMinutes: 30,  resolveMinutes: 480 },  // 30min / 8hr
+    // Stricter SLA for power
+    { category: 'power', region: '*', priority: 'critical', responseMinutes: 10,  resolveMinutes: 120 },
+    { category: 'power', region: '*', priority: 'high',     responseMinutes: 30,  resolveMinutes: 480 },
+  ];
+  for (const sla of slaConfigs) {
+    await prisma.woSlaConfig.create({ data: sla });
+  }
+  console.log(`Created ${slaConfigs.length} WO SLA Configs`);
 
   // ────────────────────────────────────────────────────────
   // 15. AUDIT LOG
@@ -874,7 +924,7 @@ async function main() {
   // ────────────────────────────────────────────────────────
   // 16. MASTER DATA (48 items across 9 categories)
   // ────────────────────────────────────────────────────────
-  const masterDataEntries = [
+  const masterDataEntries: Array<{category: string; code: string; label: string; description: string; sortOrder: number}> = [
     // asset_type (7)
     { category: 'asset_type', code: 'building', label: 'Gedung / Bangunan', description: 'Properti gedung dan bangunan', sortOrder: 1 },
     { category: 'asset_type', code: 'vehicle', label: 'Kendaraan', description: 'Kendaraan operasional', sortOrder: 2 },
@@ -943,6 +993,17 @@ async function main() {
     { category: 'vendor_category', code: 'supplier', label: 'Supplier Material', description: 'Pemasok suku cadang & material', sortOrder: 2 },
     { category: 'vendor_category', code: 'insurance_vendor', label: 'Perusahaan Asuransi', description: 'Penyedia asuransi aset', sortOrder: 3 },
     { category: 'vendor_category', code: 'contractor', label: 'Kontraktor / Jasa', description: 'Jasa konstruksi dan renovasi', sortOrder: 4 },
+
+    // wo_category (9) — Kategori Work Order dinamis
+    { category: 'wo_category', code: 'cooling',     label: 'Pendinginan (HVAC/PAC)',  description: 'AC Presisi, CRAC, chiller, cooling tower', sortOrder: 1 },
+    { category: 'wo_category', code: 'power',       label: 'Kelistrikan & Power',     description: 'Genset, UPS, ATS, PDU, panel listrik', sortOrder: 2 },
+    { category: 'wo_category', code: 'plumbing',    label: 'Plumbing & Sanitasi',     description: 'Pipa air, pompa, sanitasi, toilet', sortOrder: 3 },
+    { category: 'wo_category', code: 'fire_safety', label: 'Fire & Safety',           description: 'Fire suppression, APAR, alarm, sprinkler', sortOrder: 4 },
+    { category: 'wo_category', code: 'structural',  label: 'Sipil & Struktur',        description: 'Atap, dinding, raised floor, sipil', sortOrder: 5 },
+    { category: 'wo_category', code: 'it_infra',    label: 'IT Infrastructure',       description: 'Rack server, kabel, patch panel, network', sortOrder: 6 },
+    { category: 'wo_category', code: 'general',     label: 'General Affairs',         description: 'Lampu, AC split kantor, furniture', sortOrder: 7 },
+    { category: 'wo_category', code: 'security',    label: 'Security System',         description: 'CCTV, access control, card reader', sortOrder: 8 },
+    { category: 'wo_category', code: 'cleaning',    label: 'Housekeeping',            description: 'Kebersihan, pest control, sanitasi', sortOrder: 9 },
   ];
 
   for (const entry of masterDataEntries) {

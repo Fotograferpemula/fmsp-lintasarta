@@ -32,11 +32,24 @@ interface WorkOrderItem {
   createdAt: string;
   photos?: string[];
   asset?: { name: string; location: string } | null;
-  approvalStatus?: string | null;
-  approvedBy?: string | null;
-  approvedAt?: string | null;
+  // v2 2-tier approval
+  approvalLevel?: number;
+  approvedL1By?: string | null;
+  approvedL1At?: string | null;
+  approvedL2By?: string | null;
+  approvedL2At?: string | null;
   rejectedBy?: string | null;
   rejectedReason?: string | null;
+  // v2 verification
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  // v2 cost
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  // v2 escalation
+  escalationLevel?: number;
+  // v2 child WOs
+  childWos?: { id: string; ticketNumber: string; status: string }[];
 }
 
 export default function WorkOrderView({
@@ -69,6 +82,7 @@ export default function WorkOrderView({
   const [items, setItems] = useState<WorkOrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilter] = useState("all");
+  const [woCategories, setWoCategories] = useState<{code: string; label: string}[]>([]);
 
   // Create WO modal
   const [showModal, setShowModal] = useState(false);
@@ -76,9 +90,10 @@ export default function WorkOrderView({
     title: "",
     description: "",
     priority: "medium",
-    category: "electrical",
+    category: "",
     assetId: "",
     slaDeadline: "",
+    estimatedCost: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
@@ -108,16 +123,31 @@ export default function WorkOrderView({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/management/workorder", { headers });
-      const data = await res.json();
+      const r = await fetch("/api/management/workorder?limit=100", { headers });
+      const data = await r.json();
       if (data.success) setItems(data.data);
-    } catch {}
-    setLoading(false);
+    } catch {
+      console.error("Failed to load WO");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  // Fetch dynamic WO categories from MasterData
+  const fetchCategories = useCallback(async () => {
+    try {
+      const r = await fetch("/api/management/admin?category=wo_category", { headers });
+      const data = await r.json();
+      if (data.success && Array.isArray(data.data)) {
+        setWoCategories(data.data.filter((d: any) => d.isActive).map((d: any) => ({ code: d.code, label: d.label })));
+      }
+    } catch { /* fallback to empty */ }
   }, [token]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchCategories();
+  }, [fetchData, fetchCategories]);
 
   const handlePhotoUpload = async (files: FileList) => {
     setUploading(true);
@@ -153,19 +183,25 @@ export default function WorkOrderView({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    const payload = {
+      ...form,
+      photos: uploadedPhotos,
+      estimatedCost: form.estimatedCost ? parseFloat(form.estimatedCost) : null,
+    };
     await fetch("/api/management/workorder", {
       method: "POST",
       headers,
-      body: JSON.stringify({ ...form, photos: uploadedPhotos }),
+      body: JSON.stringify(payload),
     });
     setShowModal(false);
     setForm({
       title: "",
       description: "",
       priority: "medium",
-      category: "electrical",
+      category: "",
       assetId: "",
       slaDeadline: "",
+      estimatedCost: "",
     });
     setUploadedPhotos([]);
     setSubmitting(false);
@@ -232,31 +268,35 @@ export default function WorkOrderView({
   const statusBadge = (s: string) =>
     (
       ({
-        open: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-        in_progress: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-        approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        draft: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+        pending_approval: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        approved_l1: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        pending_l2: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+        assigned: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+        in_progress: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        on_hold: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        resolved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        verified: "bg-green-500/10 text-green-400 border-green-500/20",
+        reopened: "bg-red-500/10 text-red-400 border-red-500/20",
         rejected: "bg-red-500/10 text-red-400 border-red-500/20",
-        resolved: "bg-teal-500/10 text-teal-400 border-teal-500/20",
         closed: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
       }) as any
     )[s] || "bg-zinc-500/10 text-zinc-400";
 
-  const approvalBadge = (a: string | null | undefined) => {
-    if (!a) return null;
-    const map: Record<string, string> = {
-      pending: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      rejected: "bg-red-500/10 text-red-400 border-red-500/20",
+  const statusLabel = (s: string) => {
+    const labels: Record<string, string> = {
+      draft: "Draft", pending_approval: "Pending Approval", approved_l1: "Approved L1",
+      pending_l2: "Pending L2", assigned: "Ditugaskan", in_progress: "In Progress",
+      on_hold: "Ditunda", resolved: "Resolved", verified: "Verified",
+      reopened: "Reopened", rejected: "Ditolak", closed: "Closed",
     };
-    return map[a] || null;
+    return labels[s] || s;
   };
 
   const filtered =
     filterStatus === "all"
       ? items
-      : items.filter(
-          (i) => i.status === filterStatus || i.approvalStatus === filterStatus,
-        );
+      : items.filter((i) => i.status === filterStatus);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -292,26 +332,26 @@ export default function WorkOrderView({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           {
-            l: "Open",
-            v: items.filter((i) => i.status === "open").length,
-            c: "text-blue-400",
-            icon: "📋",
+            l: "Draft",
+            v: items.filter((i) => i.status === "draft").length,
+            c: "text-zinc-400",
+            icon: "📝",
           },
           {
-            l: "In Progress",
-            v: items.filter((i) => i.status === "in_progress").length,
+            l: "Pending",
+            v: items.filter((i) => ["pending_approval", "pending_l2"].includes(i.status)).length,
             c: "text-amber-400",
-            icon: "⚙️",
-          },
-          {
-            l: "Menunggu",
-            v: items.filter((i) => i.approvalStatus === "pending").length,
-            c: "text-yellow-400",
             icon: "⏳",
           },
           {
+            l: "Aktif",
+            v: items.filter((i) => ["assigned", "in_progress", "on_hold"].includes(i.status)).length,
+            c: "text-blue-400",
+            icon: "⚙️",
+          },
+          {
             l: "Critical",
-            v: items.filter((i) => i.priority === "critical").length,
+            v: items.filter((i) => i.priority === "critical" && !["closed", "verified", "rejected"].includes(i.status)).length,
             c: "text-red-400",
             icon: "🚨",
           },
@@ -332,12 +372,15 @@ export default function WorkOrderView({
       <div className="flex flex-wrap gap-2">
         {[
           { v: "all", l: "Semua" },
-          { v: "open", l: "Open" },
-          { v: "in_progress", l: "In Progress" },
-          { v: "pending", l: "⏳ Pending Approval" },
-          { v: "approved", l: "✅ Disetujui" },
+          { v: "draft", l: "📝 Draft" },
+          { v: "pending_approval", l: "⏳ Pending" },
+          { v: "pending_l2", l: "⏳ Pending L2" },
+          { v: "assigned", l: "📌 Assigned" },
+          { v: "in_progress", l: "⚙️ In Progress" },
+          { v: "on_hold", l: "⏸️ Ditunda" },
+          { v: "resolved", l: "✅ Resolved" },
           { v: "rejected", l: "❌ Ditolak" },
-          { v: "resolved", l: "Resolved" },
+          { v: "closed", l: "🔒 Closed" },
         ].map((f) => (
           <button
             key={f.v}
@@ -431,48 +474,41 @@ export default function WorkOrderView({
                       {item.asset?.name || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      {canApprove ? (
-                        <select
-                          value={item.status}
-                          onChange={(e) =>
-                            handleStatusChange(item.id, e.target.value)
-                          }
-                          className={`px-2 py-1 rounded-lg border text-[10px] font-bold cursor-pointer ${statusBadge(item.status)} ${c_input}`}
-                        >
-                          <option value="open">Open</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="resolved">Resolved</option>
-                          <option value="closed">Closed</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${statusBadge(item.status)}`}
-                        >
-                          {item.status.replace("_", " ")}
+                      <span
+                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${statusBadge(item.status)}`}
+                      >
+                        {statusLabel(item.status)}
+                      </span>
+                      {(item.escalationLevel ?? 0) > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[9px] font-bold">
+                          ⚡ L{item.escalationLevel}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      {item.approvalStatus ? (
-                        <span
-                          className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${approvalBadge(item.approvalStatus)}`}
-                        >
-                          {item.approvalStatus === "pending"
-                            ? "⏳ Menunggu"
-                            : item.approvalStatus === "approved"
-                              ? "✅ Disetujui"
-                              : "❌ Ditolak"}
-                        </span>
+                      {(item.approvalLevel ?? 0) > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="px-2 py-0.5 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                            ✅ L{item.approvalLevel}
+                          </span>
+                          {item.approvedL1By && (
+                            <span className={`text-[9px] ${c_sub}`}>L1: {item.approvedL1By.split("@")[0]}</span>
+                          )}
+                          {item.approvedL2By && (
+                            <span className={`text-[9px] ${c_sub}`}>L2: {item.approvedL2By.split("@")[0]}</span>
+                          )}
+                        </div>
+                      ) : item.status === "rejected" ? (
+                        <span className="px-2 py-0.5 rounded-full border text-[10px] font-bold bg-red-500/10 text-red-400 border-red-500/20">❌ Ditolak</span>
                       ) : (
                         <span className={c_sub}>—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* Approve/Reject — admin & operator only, on pending WOs */}
+                        {/* Approve/Reject — on pending WOs */}
                         {canApprove &&
-                          (!item.approvalStatus ||
-                            item.approvalStatus === "pending") && (
+                          ["pending_approval", "pending_l2"].includes(item.status) && (
                             <>
                               <button
                                 onClick={() => {
@@ -608,26 +644,43 @@ export default function WorkOrderView({
                     }
                     className={`w-full px-3 py-2.5 border rounded-xl outline-none ${c_input}`}
                   >
-                    <option value="hvac">HVAC</option>
-                    <option value="electrical">Electrical</option>
-                    <option value="plumbing">Plumbing</option>
-                    <option value="structural">Structural</option>
-                    <option value="safety">Safety</option>
+                    <option value="">-- Pilih Kategori --</option>
+                    {woCategories.map((cat) => (
+                      <option key={cat.code} value={cat.code}>{cat.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
-              <div>
-                <label className={`block mb-1 font-semibold ${c_sub}`}>
-                  SLA Deadline
-                </label>
-                <input
-                  type="datetime-local"
-                  value={form.slaDeadline}
-                  onChange={(e) =>
-                    setForm({ ...form, slaDeadline: e.target.value })
-                  }
-                  className={`w-full px-3 py-2.5 border rounded-xl outline-none focus:border-[#3370FF] ${c_input}`}
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block mb-1 font-semibold ${c_sub}`}>
+                    Estimasi Biaya (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={form.estimatedCost}
+                    onChange={(e) =>
+                      setForm({ ...form, estimatedCost: e.target.value })
+                    }
+                    className={`w-full px-3 py-2.5 border rounded-xl outline-none focus:border-[#3370FF] ${c_input}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-1 font-semibold ${c_sub}`}>
+                    SLA Deadline
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={form.slaDeadline}
+                    onChange={(e) =>
+                      setForm({ ...form, slaDeadline: e.target.value })
+                    }
+                    className={`w-full px-3 py-2.5 border rounded-xl outline-none focus:border-[#3370FF] ${c_input}`}
+                  />
+                </div>
               </div>
 
               {/* Photo Upload */}

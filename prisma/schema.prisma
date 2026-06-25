@@ -85,6 +85,7 @@ model Asset {
   photos                String[]            @default([]) // URLs of asset photos
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?           // Soft delete
   transfers             AssetTransfer[]
   legalDocuments        LegalDocument[]
   maintenanceSchedules  MaintenanceSchedule[]
@@ -106,6 +107,7 @@ model AssetTransfer {
   transferredAt DateTime @default(now())
   notes         String?
 
+  @@index([assetId])
   @@map("asset_transfers")
 }
 
@@ -140,6 +142,7 @@ model Notification {
   status         String    @default("pending") // pending | sent | failed
   scheduledAt    DateTime
   sentAt         DateTime?
+  readAt         DateTime? // Kapan notifikasi dibaca oleh penerima
 
   @@index([status])
   @@index([scheduledAt])
@@ -183,6 +186,7 @@ model VendorContract {
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  deletedAt     DateTime? // Soft delete
 
   @@index([endDate])
   @@index([status])
@@ -211,6 +215,8 @@ model Employee {
   gadaLevel    String?   // Khusus security: pratama | madya | utama
   ktaNumber    String?   // Nomor KTA Satpam
   ktaExpiry    DateTime? // Masa berlaku KTA
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime? // Soft delete
 
   @@index([role])
   @@index([department])
@@ -262,6 +268,7 @@ model AccountingTransaction {
 
   @@index([category])
   @@index([date])
+  @@index([rabBudgetId])
   @@map("accounting_transactions")
 }
 
@@ -280,7 +287,7 @@ model RabBudget {
 }
 
 // ────────────────────────────────────────────────────────
-// 4. MODEL PHASE 2D: WORK ORDER / TIKET KERJA
+// 4. MODEL PHASE 2D: WORK ORDER / TIKET KERJA (v2)
 // ────────────────────────────────────────────────────────
 
 model WorkOrder {
@@ -289,30 +296,104 @@ model WorkOrder {
   title          String
   description    String    @db.Text
   priority       String    // critical | high | medium | low
-  category       String    // hvac | electrical | plumbing | structural | safety
+  category       String    // Dinamis dari MasterData wo_category
   assetId        String?
   asset          Asset?    @relation(fields: [assetId], references: [id])
   assignedTo     String?   // Employee NIP
   reportedBy     String    // User email
-  status         String    @default("open") // open | in_progress | approved | rejected | resolved | closed
+  // Status: draft | pending_approval | approved_l1 | pending_l2 |
+  //         assigned | in_progress | on_hold | resolved | verified |
+  //         reopened | rejected | closed
+  status         String    @default("draft")
   slaDeadline    DateTime?
   resolvedAt     DateTime?
-  // Approval workflow fields
-  approvalStatus String?   // pending | approved | rejected
-  approvedBy     String?   // User email
-  approvedAt     DateTime?
+
+  // ── 2-Tier Approval ──
+  approvalLevel  Int       @default(0) // 0=belum, 1=L1 done, 2=L2 done
+  approvedL1By   String?   // Email admin lokasi/regional
+  approvedL1At   DateTime?
+  approvedL2By   String?   // Email manager/admin pusat
+  approvedL2At   DateTime?
   rejectedBy     String?
   rejectedAt     DateTime?
   rejectedReason String?   @db.Text
+
+  // ── Verification (resolved → verified → closed) ──
+  verifiedBy     String?   // Pelapor atau Admin
+  verifiedAt     DateTime?
+
+  // ── Cost Tracking ──
+  estimatedCost  Float?    // Estimasi biaya sebelum approval
+  actualCost     Float?    // Biaya aktual setelah selesai
+
+  // ── Escalation ──
+  escalationLevel Int      @default(0) // 0=normal, 1=escalated, 2=critical
+  escalatedAt     DateTime?
+
+  // ── Follow-up / Parent-Child ──
+  parentWoId     String?
+  parentWo       WorkOrder?  @relation("WoFollowUp", fields: [parentWoId], references: [id])
+  childWos       WorkOrder[] @relation("WoFollowUp")
+
   photos         String[]  @default([]) // URLs of uploaded photos
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // Soft delete
+  statusLogs     WorkOrderStatusLog[]
 
   @@index([status])
   @@index([priority])
+  @@index([category])
   @@index([assignedTo])
-  @@index([approvalStatus])
+  @@index([approvalLevel])
+  @@index([assetId])
+  @@index([parentWoId])
   @@map("work_orders")
+}
+
+model WorkOrderStatusLog {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  fromStatus  String    // Status sebelumnya
+  toStatus    String    // Status baru
+  changedBy   String    // Email user yang mengubah
+  reason      String?   // Alasan (khusus reject/close/on_hold)
+  createdAt   DateTime  @default(now())
+
+  @@index([workOrderId])
+  @@map("work_order_status_logs")
+}
+
+// ── WO Approval Configuration per Category ──
+model WoApprovalConfig {
+  id              String   @id @default(cuid())
+  category        String   @unique // Matches MasterData wo_category code
+  requireL1       Boolean  @default(true)
+  l1Roles         String[] @default(["admin_lokasi", "admin_regional"])
+  requireL2       Boolean  @default(false)
+  l2Roles         String[] @default(["manager_fms", "admin_pusat"])
+  l2Priorities    String[] @default(["critical", "high"]) // Kapan L2 wajib
+  autoApproveBelow Float?  // Auto-approve jika estimatedCost di bawah nilai ini
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("wo_approval_configs")
+}
+
+// ── WO SLA Configuration per Category × Region × Priority ──
+model WoSlaConfig {
+  id              String   @id @default(cuid())
+  category        String   // wo_category code (or "*" for default)
+  region          String   // region code (or "*" for default)
+  priority        String   // critical | high | medium | low
+  responseMinutes Int      // Target response time in minutes
+  resolveMinutes  Int      // Target resolution time in minutes
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([category, region, priority])
+  @@map("wo_sla_configs")
 }
 
 // ────────────────────────────────────────────────────────
@@ -346,7 +427,7 @@ model DeviceState {
 }
 
 model TimeSeries {
-  id        Int      @id @default(autoincrement())
+  id        BigInt   @id @default(autoincrement())
   timestamp DateTime
   deviceId  String
   metric    String   // temperature | humidity | power_kw | pue

@@ -9,17 +9,31 @@ import { withPermission } from "@/lib/rbac-middleware";
 import { InventoryCreateSchema, validateRequest } from "@/lib/validators";
 import { getRegionFilter } from "@/lib/region-filter";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "management";
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
     const regionWhere = getRegionFilter(user);
-    const items = await prisma.inventoryItem.findMany({
-      where: regionWhere,
-      orderBy: { sku: "asc" },
+    const where = { ...regionWhere };
+
+    const [items, total] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy: { sku: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.inventoryItem.count({ where }),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: items,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: items });
   } catch (error: any) {
     return handleApiError(error, "API");
   }

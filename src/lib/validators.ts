@@ -152,11 +152,13 @@ export const WorkOrderCreateSchema = z.object({
   priority: z.enum(["critical", "high", "medium", "low"], {
     message: "Priority harus: critical, high, medium, atau low",
   }),
-  category: z.string().min(1, "Kategori wajib diisi").trim(),
+  category: z.string().min(1, "Kategori wajib diisi").trim(), // Dinamis dari MasterData
   assetId: z.string().optional().nullable(),
   assignedTo: z.string().optional().nullable(),
   slaDeadline: z.string().optional().nullable(),
   photos: z.array(z.string()).optional().default([]),
+  estimatedCost: z.coerce.number().min(0).optional().nullable(),
+  parentWoId: z.string().optional().nullable(),
 });
 
 // ─── Employee / HRD ───

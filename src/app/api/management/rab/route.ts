@@ -8,25 +8,34 @@ import {
 import { withPermission } from "@/lib/rbac-middleware";
 import { RabCreateSchema, validateRequest } from "@/lib/validators";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "management";
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
-    const budgets = await prisma.rabBudget.findMany({
-      include: {
-        transactions: {
-          select: {
-            id: true,
-            amount: true,
-            type: true,
-            description: true,
-            date: true,
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
+
+    const [budgets, total] = await Promise.all([
+      prisma.rabBudget.findMany({
+        include: {
+          transactions: {
+            select: {
+              id: true,
+              amount: true,
+              type: true,
+              description: true,
+              date: true,
+            },
           },
         },
-      },
-      orderBy: { year: "desc" },
-    });
+        orderBy: { year: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.rabBudget.count(),
+    ]);
 
     // Compute actual spent from linked transactions
     const enriched = budgets.map((b) => {
@@ -36,7 +45,11 @@ async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
       return { ...b, computedSpent };
     });
 
-    return NextResponse.json({ success: true, data: enriched });
+    return NextResponse.json({
+      success: true,
+      data: enriched,
+      pagination: paginationMeta(total, page, limit),
+    });
   } catch (error: any) {
     return handleApiError(error, "API");
   }

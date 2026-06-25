@@ -9,16 +9,29 @@ import { withPermission } from "@/lib/rbac-middleware";
 import { sendPendingNotifications } from "@/lib/cron-scheduler";
 import { getAppSetting } from "@/lib/app-settings";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "notifications";
 
 // GET: Ambil daftar semua notifikasi/pengingat
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
-    const notifications = await prisma.notification.findMany({
-      orderBy: { scheduledAt: "desc" },
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
+
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        orderBy: { scheduledAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.notification.count(),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: notifications,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: notifications });
   } catch (error: any) {
     return handleApiError(error, "API");
   }

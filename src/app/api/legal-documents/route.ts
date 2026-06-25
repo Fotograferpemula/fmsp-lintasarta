@@ -14,6 +14,7 @@ import {
 } from "@/lib/validators";
 import { getRegionFilterNested } from "@/lib/region-filter";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "legal-documents";
 
@@ -32,13 +33,26 @@ function calculateComplianceStatus(expiryDateStr: string): string {
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
     const regionWhere = getRegionFilterNested(user);
-    const docs = await prisma.legalDocument.findMany({
-      where: regionWhere,
-      include: { asset: { select: { name: true, location: true } } },
-      orderBy: { expiryDate: "asc" },
+    const where = { ...regionWhere };
+
+    const [docs, total] = await Promise.all([
+      prisma.legalDocument.findMany({
+        where,
+        include: { asset: { select: { name: true, location: true } } },
+        orderBy: { expiryDate: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.legalDocument.count({ where }),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: docs,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: docs });
   } catch (error: any) {
     return handleApiError(error, "API");
   }

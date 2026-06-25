@@ -8,18 +8,31 @@ import {
 import { withPermission } from "@/lib/rbac-middleware";
 import { TransactionCreateSchema, validateRequest } from "@/lib/validators";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "management";
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
-    const transactions = await prisma.accountingTransaction.findMany({
-      include: {
-        rabBudget: { select: { department: true, category: true, year: true } },
-      },
-      orderBy: { date: "desc" },
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
+
+    const [transactions, total] = await Promise.all([
+      prisma.accountingTransaction.findMany({
+        include: {
+          rabBudget: { select: { department: true, category: true, year: true } },
+        },
+        orderBy: { date: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.accountingTransaction.count(),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: transactions,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: transactions });
   } catch (error: any) {
     return handleApiError(error, "API");
   }

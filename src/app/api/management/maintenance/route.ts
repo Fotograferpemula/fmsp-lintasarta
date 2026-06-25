@@ -9,33 +9,47 @@ import { withPermission } from "@/lib/rbac-middleware";
 import { MaintenanceCreateSchema, validateRequest } from "@/lib/validators";
 import { getRegionFilterNested } from "@/lib/region-filter";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "management";
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
     const regionWhere = getRegionFilterNested(user);
-    const schedules = await prisma.maintenanceSchedule.findMany({
-      where: regionWhere,
-      include: {
-        asset: {
-          select: {
-            id: true,
-            name: true,
-            location: true,
-            type: true,
-            status: true,
-            specs: true,
-            bookValue: true,
-            purchaseDate: true,
-            lifecycleStatus: true,
-            photos: true,
+    const where = { ...regionWhere };
+
+    const [schedules, total] = await Promise.all([
+      prisma.maintenanceSchedule.findMany({
+        where,
+        include: {
+          asset: {
+            select: {
+              id: true,
+              name: true,
+              location: true,
+              type: true,
+              status: true,
+              specs: true,
+              bookValue: true,
+              purchaseDate: true,
+              lifecycleStatus: true,
+              photos: true,
+            },
           },
         },
-      },
-      orderBy: { nextDue: "asc" },
+        orderBy: { nextDue: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.maintenanceSchedule.count({ where }),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: schedules,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: schedules });
   } catch (error: any) {
     return handleApiError(error, "API");
   }

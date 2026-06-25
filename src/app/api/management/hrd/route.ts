@@ -8,24 +8,35 @@ import {
 import { withPermission } from "@/lib/rbac-middleware";
 import { EmployeeCreateSchema, validateRequest } from "@/lib/validators";
 import { handleApiError } from "@/lib/api-error";
+import { parsePagination, paginationMeta } from "@/lib/pagination";
 
 const RESOURCE = "management";
 
 async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
   try {
     const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
     const roleFilter = searchParams.get("role");
     const deptFilter = searchParams.get("department");
 
-    const where: Record<string, string> = {};
+    const where: Record<string, any> = { deletedAt: null };
     if (roleFilter) where.role = roleFilter;
     if (deptFilter) where.department = deptFilter;
 
-    const employees = await prisma.employee.findMany({
-      where,
-      orderBy: { nip: "asc" },
+    const [employees, total] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        orderBy: { nip: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.employee.count({ where }),
+    ]);
+    return NextResponse.json({
+      success: true,
+      data: employees,
+      pagination: paginationMeta(total, page, limit),
     });
-    return NextResponse.json({ success: true, data: employees });
   } catch (error: any) {
     return handleApiError(error, "API");
   }
@@ -170,16 +181,29 @@ async function handleDelete(req: AuthenticatedRequest, user: JWTPayload) {
     const employee = await prisma.employee.findUnique({
       where: { id: body.id },
     });
-    await prisma.employee.delete({ where: { id: body.id } });
+    if (!employee) {
+      return NextResponse.json(
+        { success: false, error: "Employee tidak ditemukan." },
+        { status: 404 },
+      );
+    }
 
-    await prisma.auditLog.create({
-      data: {
-        user: user.email,
-        action: "DELETE_EMPLOYEE",
-        resource: "Employee",
-        details: `Employee "${employee?.name}" (NIP: ${employee?.nip}) dihapus.`,
-        ip: req.clientIp || "0.0.0.0",
-      },
+    // Soft delete
+    await prisma.$transaction(async (tx) => {
+      await tx.employee.update({
+        where: { id: body.id },
+        data: { deletedAt: new Date() },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          user: user.email,
+          action: "DELETE_EMPLOYEE",
+          resource: "Employee",
+          details: `Employee "${employee.name}" (NIP: ${employee.nip}) dihapus (soft).`,
+          ip: req.clientIp || "0.0.0.0",
+        },
+      });
     });
 
     return NextResponse.json({

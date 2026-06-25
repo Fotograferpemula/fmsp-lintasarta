@@ -18,6 +18,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   department: 'Departemen',
   maintenance_type: 'Tipe Pemeliharaan',
   vendor_category: 'Kategori Vendor',
+  wo_category: 'Kategori Work Order',
 };
 
 export default function AdminView({ isDark, token }: { isDark: boolean; token: string }) {

@@ -1,56 +1,50 @@
 #!/bin/bash
-# ================================================================
+# ════════════════════════════════════════════════════════
 # FMSP Lintasarta — Database Backup Script
-# ================================================================
-# Dijalankan via cron: 0 19 * * * (= 02:00 WIB = 19:00 UTC)
-# Contoh crontab: 0 19 * * * /path/to/backup-db.sh >> /var/log/fmsp-backup.log 2>&1
-#
-# Atau via GitHub Actions schedule (lihat .github/workflows/backup.yml)
-# ================================================================
+# Runs pg_dump with 7-day rotation
+# Usage: ./scripts/backup-db.sh
+# Cron:  0 2 * * * /path/to/scripts/backup-db.sh
+# ════════════════════════════════════════════════════════
 
 set -euo pipefail
 
-# Config
+# ── Configuration ─────────────────────────────────────
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-RETENTION_DAYS="${RETENTION_DAYS:-30}"
+KEEP_DAYS="${KEEP_DAYS:-7}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-FILENAME="fmsp_backup_${TIMESTAMP}.sql.gz"
+CONTAINER_NAME="${CONTAINER_NAME:-fmsp-lintasarta-postgres-1}"
 
-# Validasi
-if [ -z "${DATABASE_URL:-}" ]; then
-  echo "❌ ERROR: DATABASE_URL environment variable tidak ditemukan."
-  echo "   Set DATABASE_URL=postgresql://user:pass@host:port/db"
-  exit 1
+# Load .env if available
+if [ -f .env ]; then
+  export $(grep -E '^(POSTGRES_USER|POSTGRES_DB|POSTGRES_PASSWORD)=' .env | xargs)
 fi
 
-# Buat direktori backup jika belum ada
+DB_USER="${POSTGRES_USER:-fmsp_user}"
+DB_NAME="${POSTGRES_DB:-fmsp_db}"
+
+# ── Create backup directory ───────────────────────────
 mkdir -p "$BACKUP_DIR"
 
-echo "┌─────────────────────────────────────────────┐"
-echo "│ 🗄️  FMSP Database Backup                     │"
-echo "├─────────────────────────────────────────────┤"
-echo "│ Waktu : $(date '+%Y-%m-%d %H:%M:%S %Z')            │"
-echo "│ File  : $FILENAME      │"
-echo "│ Retensi: ${RETENTION_DAYS} hari                          │"
-echo "└─────────────────────────────────────────────┘"
+# ── Run backup ────────────────────────────────────────
+BACKUP_FILE="$BACKUP_DIR/${DB_NAME}_${TIMESTAMP}.sql.gz"
 
-# Jalankan backup
-echo "⏳ Menjalankan pg_dump..."
-pg_dump "$DATABASE_URL" --no-owner --no-privileges --clean --if-exists | gzip > "$BACKUP_DIR/$FILENAME"
+echo "[$(date)] Starting backup of $DB_NAME..."
 
-# Cek ukuran file
-FILE_SIZE=$(du -h "$BACKUP_DIR/$FILENAME" | cut -f1)
-echo "✅ Backup selesai: $FILENAME ($FILE_SIZE)"
+docker exec "$CONTAINER_NAME" pg_dump \
+  -U "$DB_USER" \
+  -d "$DB_NAME" \
+  --clean \
+  --if-exists \
+  --no-owner \
+  --no-privileges \
+  | gzip > "$BACKUP_FILE"
 
-# Hapus backup lebih dari N hari
-DELETED=$(find "$BACKUP_DIR" -name "fmsp_backup_*.sql.gz" -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
-if [ "$DELETED" -gt 0 ]; then
-  echo "🧹 $DELETED file backup lama dihapus (> ${RETENTION_DAYS} hari)"
-fi
+FILESIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+echo "[$(date)] Backup complete: $BACKUP_FILE ($FILESIZE)"
 
-# List backup yang tersisa
-echo ""
-echo "📁 Backup tersedia:"
-ls -lh "$BACKUP_DIR"/fmsp_backup_*.sql.gz 2>/dev/null || echo "   (tidak ada)"
-echo ""
-echo "✅ Backup selesai pada $(date '+%Y-%m-%d %H:%M:%S %Z')"
+# ── Rotate old backups ────────────────────────────────
+echo "[$(date)] Removing backups older than $KEEP_DAYS days..."
+find "$BACKUP_DIR" -name "*.sql.gz" -type f -mtime +"$KEEP_DAYS" -delete
+
+REMAINING=$(ls -1 "$BACKUP_DIR"/*.sql.gz 2>/dev/null | wc -l)
+echo "[$(date)] Done. $REMAINING backup(s) retained."

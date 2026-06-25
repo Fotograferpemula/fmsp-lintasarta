@@ -49,7 +49,7 @@ async function handleGet(req: AuthenticatedRequest, user: JWTPayload) {
             status: true,
             priority: true,
             category: true,
-            approvalStatus: true,
+            approvalLevel: true,
             createdAt: true,
             resolvedAt: true,
           },
